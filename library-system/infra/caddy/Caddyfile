@@ -1,0 +1,15 @@
+https://192.168.0.112 {
+  tls C:/Users/user/Documents/Playground/library-system/infra/caddy/certs/library-system.pem C:/Users/user/Documents/Playground/library-system/infra/caddy/certs/library-system-key.pem
+
+  handle /api/* {
+    reverse_proxy 127.0.0.1:4000
+  }
+
+  handle /uploads/* {
+    reverse_proxy 127.0.0.1:4000
+  }
+
+  handle {
+    reverse_proxy 127.0.0.1:3000
+  }
+}
