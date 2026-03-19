@@ -1,58 +1,32 @@
 # Library System
 
-Mobile-first library management MVP for small libraries, schools, classrooms, and nonprofit reading rooms.
+![Library System cover](docs/assets/github-cover.svg)
 
-This project focuses on a practical workflow:
-- use a phone as a barcode scanner
+Mobile-first library management MVP for small libraries, classrooms, schools, and nonprofit reading rooms.
+
+This project is built around a simple real-world workflow:
+- use a phone as the barcode scanner
 - create books and members on site
-- check books in and out
-- store cover/member photos
-- run on a local PC with internal HTTPS support
+- check books in and out quickly
+- keep cover photos and member photos
+- run on a local PC with internal HTTPS for iPhone camera access
 
-## What Is Working
+## Highlights
+
+- Mobile PWA for day-to-day library operations
+- Book create, list, edit
+- Member create, list, edit
+- Checkout and return API flow
+- Barcode scanning with phone camera
+- ISBN metadata lookup with manual fallback
+- Duplicate checks for ISBN and accession code
+- Local image upload for book covers and member photos
+- PostgreSQL backend with Express + TypeScript
+- Internal HTTPS via Caddy for iPhone compatibility
+
+## Current Scope
 
 ### Mobile PWA
-- mobile home and navigation
-- book list, create, edit
-- member list, create, edit
-- checkout and return flows
-- barcode scanning with phone camera
-- ISBN metadata lookup with manual fallback
-- duplicate checking for ISBN and accession code
-- cover photo and member photo upload
-
-### Backend API
-- `books`
-- `members`
-- `loans`
-- `uploads`
-- PostgreSQL integration
-
-### Local Deployment
-- local PC server setup
-- internal HTTPS for iPhone camera access
-- Caddy reverse proxy
-
-## Project Structure
-
-```text
-library-system/
-  backend/        Express + TypeScript API
-  database/       PostgreSQL schema and seed data
-  docs/           notes and devlog
-  frontend/       Next.js mobile PWA
-  infra/caddy/    local HTTPS reverse proxy
-```
-
-## Local URLs
-
-- Frontend: `http://localhost:3000`
-- Backend API: `http://localhost:4000`
-- Internal HTTPS entry: `https://192.168.0.112`
-- Mobile flow: `https://192.168.0.112/mobile`
-
-## Key Mobile Routes
-
 - `/mobile`
 - `/mobile/books`
 - `/mobile/books/new`
@@ -63,8 +37,7 @@ library-system/
 - `/mobile/loan`
 - `/mobile/return`
 
-## Core API Routes
-
+### Core API
 - `GET /api/books`
 - `GET /api/books/check`
 - `GET /api/books/lookup/isbn/:isbn`
@@ -78,6 +51,32 @@ library-system/
 - `POST /api/loans/return`
 - `POST /api/uploads/book-cover`
 - `POST /api/uploads/member-photo`
+
+## Tech Stack
+
+- Frontend: Next.js
+- Backend: Express + TypeScript
+- Database: PostgreSQL
+- Reverse proxy: Caddy
+- Mobile scanning: browser camera + barcode scanner component
+
+## Project Structure
+
+```text
+library-system/
+  backend/        Express + TypeScript API
+  database/       PostgreSQL schema and seed data
+  docs/           notes, assets, and devlog
+  frontend/       Next.js mobile PWA
+  infra/caddy/    local HTTPS reverse proxy
+```
+
+## Local URLs
+
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:4000`
+- Internal HTTPS entry: `https://192.168.0.112`
+- Mobile flow: `https://192.168.0.112/mobile`
 
 ## Quick Start
 
@@ -106,11 +105,20 @@ npm run dev
 
 ## Notes
 
-- If ISBN metadata lookup does not find a result, the create-book screen still allows manual entry.
+- If ISBN metadata lookup cannot find a result, the create-book page still supports manual entry.
 - iPhone camera scanning requires HTTPS.
-- Local `.env`, uploaded files, certs, and build artifacts are intentionally ignored in git.
+- Local `.env`, uploaded files, certificates, and build artifacts are intentionally ignored in git.
+- This repo is currently optimized for internal deployment and MVP iteration speed.
+
+## Next Experiments
+
+- inventory workflow
+- list search and filters
+- stronger duplicate prevention rules
+- improved Chinese ISBN metadata coverage
+- overdue reminders and circulation reporting
 
 ## Docs
 
-- [DEVLOG](C:\Users\user\Documents\Playground\library-system\docs\DEVLOG.md)
-- [Database Notes](C:\Users\user\Documents\Playground\library-system\database\README.md)
+- [DEVLOG](docs/DEVLOG.md)
+- [Database Notes](database/README.md)
