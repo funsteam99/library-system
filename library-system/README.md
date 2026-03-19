@@ -1,48 +1,73 @@
 # Library System
 
-手機優先的圖書管理系統 MVP，支援：
+Mobile-first library management MVP for small libraries, schools, classrooms, and nonprofit reading rooms.
 
-- 手機 PWA 借書 / 還書
-- 手機書籍建檔 / 編輯 / 清單
-- 手機會員建檔 / 編輯 / 清單
-- ISBN / 條碼掃描
-- PostgreSQL 資料庫
-- 內網 HTTPS，供 iPhone 相機使用
+This project focuses on a practical workflow:
+- use a phone as a barcode scanner
+- create books and members on site
+- check books in and out
+- store cover/member photos
+- run on a local PC with internal HTTPS support
 
-## 專案結構
+## What Is Working
+
+### Mobile PWA
+- mobile home and navigation
+- book list, create, edit
+- member list, create, edit
+- checkout and return flows
+- barcode scanning with phone camera
+- ISBN metadata lookup with manual fallback
+- duplicate checking for ISBN and accession code
+- cover photo and member photo upload
+
+### Backend API
+- `books`
+- `members`
+- `loans`
+- `uploads`
+- PostgreSQL integration
+
+### Local Deployment
+- local PC server setup
+- internal HTTPS for iPhone camera access
+- Caddy reverse proxy
+
+## Project Structure
 
 ```text
 library-system/
   backend/        Express + TypeScript API
-  database/       PostgreSQL schema / seed
-  docs/           規格與開發紀錄
-  frontend/       Next.js PWA
-  infra/caddy/    內網 HTTPS 反向代理與憑證
+  database/       PostgreSQL schema and seed data
+  docs/           notes and devlog
+  frontend/       Next.js mobile PWA
+  infra/caddy/    local HTTPS reverse proxy
 ```
 
-## 本機與內網入口
+## Local URLs
 
-- 前端本機：`http://localhost:3000`
-- 後端本機：`http://localhost:4000`
-- 手機 / 內網 HTTPS：`https://192.168.0.112`
-- 手機首頁：`https://192.168.0.112/mobile`
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:4000`
+- Internal HTTPS entry: `https://192.168.0.112`
+- Mobile flow: `https://192.168.0.112/mobile`
 
-## 目前可用功能
+## Key Mobile Routes
 
-### 行動端
+- `/mobile`
+- `/mobile/books`
+- `/mobile/books/new`
+- `/mobile/books/:id/edit`
+- `/mobile/members`
+- `/mobile/members/new`
+- `/mobile/members/:id/edit`
+- `/mobile/loan`
+- `/mobile/return`
 
-- 借書：`/mobile/loan`
-- 還書：`/mobile/return`
-- 書籍清單：`/mobile/books`
-- 書籍建檔：`/mobile/books/new`
-- 書籍編輯：`/mobile/books/:id/edit`
-- 會員清單：`/mobile/members`
-- 會員建檔：`/mobile/members/new`
-- 會員編輯：`/mobile/members/:id/edit`
-
-### API
+## Core API Routes
 
 - `GET /api/books`
+- `GET /api/books/check`
+- `GET /api/books/lookup/isbn/:isbn`
 - `POST /api/books`
 - `PATCH /api/books/:id`
 - `GET /api/members`
@@ -51,17 +76,19 @@ library-system/
 - `GET /api/loans`
 - `POST /api/loans/checkout`
 - `POST /api/loans/return`
+- `POST /api/uploads/book-cover`
+- `POST /api/uploads/member-photo`
 
-## 啟動方式
+## Quick Start
 
-### 1. 資料庫
+### 1. Database
 
 ```bash
 psql -U postgres -d library_system -f database/schema.sql
 psql -U postgres -d library_system -f database/dev-seed.sql
 ```
 
-### 2. 後端
+### 2. Backend
 
 ```bash
 cd backend
@@ -69,7 +96,7 @@ npm install
 npm run dev
 ```
 
-### 3. 前端
+### 3. Frontend
 
 ```bash
 cd frontend
@@ -77,26 +104,13 @@ npm install
 npm run dev
 ```
 
-## HTTPS 與 iPhone
+## Notes
 
-iPhone 相機掃碼需要安全環境。專案已配置：
+- If ISBN metadata lookup does not find a result, the create-book screen still allows manual entry.
+- iPhone camera scanning requires HTTPS.
+- Local `.env`, uploaded files, certs, and build artifacts are intentionally ignored in git.
 
-- Caddy 反向代理
-- `mkcert` 產生本機憑證
-- HTTPS 入口：`https://192.168.0.112`
+## Docs
 
-若要讓 iPhone 信任本機 HTTPS，需在手機上安裝並信任：
-
-- [rootCA.pem](C:\Users\user\Documents\Playground\library-system\infra\caddy\rootCA.pem)
-
-## 開發紀錄
-
-請看：
-
-- [DEVLOG.md](C:\Users\user\Documents\Playground\library-system\docs\DEVLOG.md)
-
-## 目前已知限制
-
-- 封面 / 會員照片目前只有前端預覽，尚未正式上傳到後端
-- 盤點功能尚未開始實作
-- Windows PowerShell 直接送中文 JSON 到 API 時，終端輸出可能出現亂碼；需以手機 / 瀏覽器實際再驗證
+- [DEVLOG](C:\Users\user\Documents\Playground\library-system\docs\DEVLOG.md)
+- [Database Notes](C:\Users\user\Documents\Playground\library-system\database\README.md)
