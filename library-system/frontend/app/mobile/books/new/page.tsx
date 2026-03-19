@@ -4,6 +4,7 @@ import Link from "next/link";
 import { type ChangeEvent, type FormEvent, useMemo, useRef, useState, useTransition } from "react";
 
 import { BarcodeScanner } from "../../../components/barcode-scanner";
+import { CameraCapture } from "../../../components/camera-capture";
 import { apiRequest } from "../../../lib/api";
 import { uploadImage } from "../../../lib/upload";
 
@@ -200,6 +201,11 @@ export default function MobileBookCreatePage() {
     void checkDuplicates(isbn, accessionCode);
   }
 
+  function setCapturedCover(file: File, previewUrl: string) {
+    setCoverFile(file);
+    setCoverPreview(previewUrl);
+  }
+
   function handleCoverChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
 
@@ -209,8 +215,7 @@ export default function MobileBookCreatePage() {
       return;
     }
 
-    setCoverFile(file);
-    setCoverPreview(URL.createObjectURL(file));
+    setCapturedCover(file, URL.createObjectURL(file));
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
@@ -266,7 +271,7 @@ export default function MobileBookCreatePage() {
       <article className="hero-card compact">
         <p className="eyebrow">Book intake</p>
         <h2>書籍建檔</h2>
-        <p>先掃 ISBN 嘗試帶入書目，再補館藏條碼與封面，就能完成建檔。</p>
+        <p>手機可掃 ISBN，桌機也可直接開 webcam 拍封面，再補館藏條碼完成建檔。</p>
       </article>
 
       <section className="action-grid compact">
@@ -373,8 +378,10 @@ export default function MobileBookCreatePage() {
 
         <label className="field">
           <span>封面照片</span>
-          <input type="file" accept="image/*" capture="environment" onChange={handleCoverChange} />
+          <input type="file" accept="image/*" onChange={handleCoverChange} />
         </label>
+
+        <CameraCapture onCapture={setCapturedCover} />
 
         {coverPreview ? (
           <div className="cover-preview-card">

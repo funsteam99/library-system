@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useState, useTransition } from "react";
 
+import { CameraCapture } from "../../../../components/camera-capture";
 import { apiRequest } from "../../../../lib/api";
 import { uploadImage } from "../../../../lib/upload";
 
@@ -45,7 +46,10 @@ export default function MobileBookEditPage() {
     async function loadBook() {
       try {
         const data = await apiRequest<BookDetailResponse>(`/api/books/${params.id}`);
-        if (!active) return;
+        if (!active) {
+          return;
+        }
+
         setIsbn(data.item.isbn ?? "");
         setAccessionCode(data.item.accessionCode);
         setTitle(data.item.title);
@@ -58,7 +62,7 @@ export default function MobileBookEditPage() {
         setError(null);
       } catch (loadError) {
         if (active) {
-          setError(loadError instanceof Error ? loadError.message : "書籍資料載入失敗");
+          setError(loadError instanceof Error ? loadError.message : "讀取書籍資料失敗。");
         }
       } finally {
         if (active) {
@@ -68,24 +72,30 @@ export default function MobileBookEditPage() {
     }
 
     void loadBook();
+
     return () => {
       active = false;
     };
   }, [params.id]);
 
-  function handleCoverChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function setCapturedCover(file: File, previewUrl: string) {
+    setCoverFile(file);
+    setCoverPreview(previewUrl);
+  }
+
+  function handleCoverChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+
     if (!file) {
       setCoverFile(null);
       setCoverPreview(coverUrl);
       return;
     }
 
-    setCoverFile(file);
-    setCoverPreview(URL.createObjectURL(file));
+    setCapturedCover(file, URL.createObjectURL(file));
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
     setError(null);
@@ -113,10 +123,10 @@ export default function MobileBookEditPage() {
           }),
         });
 
-        setMessage("書籍資料已更新");
+        setMessage("書籍資料已更新。");
         router.push("/mobile/books");
       } catch (submitError) {
-        setError(submitError instanceof Error ? submitError.message : "書籍更新失敗");
+        setError(submitError instanceof Error ? submitError.message : "更新書籍失敗。");
       }
     });
   }
@@ -126,14 +136,14 @@ export default function MobileBookEditPage() {
       <article className="hero-card compact">
         <p className="eyebrow">Edit book</p>
         <h2>編輯書籍</h2>
-        <p>修改書名、作者、館藏條碼等主檔資料。存檔後會回到書籍清單。</p>
+        <p>桌機可直接用 webcam 重新拍封面，更新後會回到書籍清單。</p>
       </article>
 
       <section className="action-grid compact">
         <Link href="/mobile/books" className="action-card">
           <div className="action-badge">返回</div>
-          <h3>回書籍清單</h3>
-          <p>不修改時可直接回到清單查看其他書。</p>
+          <h3>回到書籍清單</h3>
+          <p>若只想查看目前資料，可先回清單再重新進入。</p>
         </Link>
       </section>
 
@@ -146,22 +156,27 @@ export default function MobileBookEditPage() {
             <span>ISBN</span>
             <input value={isbn} onChange={(event) => setIsbn(event.target.value)} />
           </label>
+
           <label className="field">
             <span>館藏條碼</span>
             <input value={accessionCode} onChange={(event) => setAccessionCode(event.target.value)} required />
           </label>
+
           <label className="field">
             <span>書名</span>
             <input value={title} onChange={(event) => setTitle(event.target.value)} required />
           </label>
+
           <label className="field">
             <span>作者</span>
             <input value={author} onChange={(event) => setAuthor(event.target.value)} />
           </label>
+
           <label className="field">
             <span>出版社</span>
             <input value={publisher} onChange={(event) => setPublisher(event.target.value)} />
           </label>
+
           <label className="field">
             <span>出版年</span>
             <input
@@ -172,21 +187,27 @@ export default function MobileBookEditPage() {
               onChange={(event) => setPublishYear(event.target.value)}
             />
           </label>
+
           <label className="field">
             <span>封面照片</span>
-            <input type="file" accept="image/*" capture="environment" onChange={handleCoverChange} />
+            <input type="file" accept="image/*" onChange={handleCoverChange} />
           </label>
+
+          <CameraCapture label="重新拍封面" onCapture={setCapturedCover} />
+
           {coverPreview ? (
             <div className="cover-preview-card">
               <img src={coverPreview} alt="封面預覽" className="cover-preview-image" />
             </div>
           ) : null}
+
           <label className="field">
             <span>備註</span>
             <textarea value={remark} onChange={(event) => setRemark(event.target.value)} rows={4} />
           </label>
+
           <button type="submit" className="primary-button" disabled={isPending}>
-            {isPending ? "儲存中..." : "儲存變更"}
+            {isPending ? "更新中..." : "儲存變更"}
           </button>
         </form>
       ) : null}
