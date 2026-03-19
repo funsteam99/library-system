@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { type ChangeEvent, type FormEvent, useState, useTransition } from "react";
 
 import { BarcodeScanner } from "../../../components/barcode-scanner";
+import { CameraCapture } from "../../../components/camera-capture";
 import { apiRequest } from "../../../lib/api";
 import { uploadImage } from "../../../lib/upload";
 
@@ -35,18 +36,24 @@ export default function MobileMemberCreatePage() {
     setError(null);
   }
 
-  function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function setCapturedPhoto(file: File, previewUrl: string) {
+    setPhotoFile(file);
+    setPhotoPreview(previewUrl);
+  }
+
+  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+
     if (!file) {
       setPhotoFile(null);
       setPhotoPreview(null);
       return;
     }
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+
+    setCapturedPhoto(file, URL.createObjectURL(file));
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
     setError(null);
@@ -76,9 +83,9 @@ export default function MobileMemberCreatePage() {
         });
 
         setCreatedMemberId(payload.item.id);
-        setMessage(`已建立會員 ${payload.item.name}，編號 ${payload.item.memberCode}`);
+        setMessage(`已建立會員 ${payload.item.name}，編號 ${payload.item.memberCode}。`);
       } catch (submitError) {
-        setError(submitError instanceof Error ? submitError.message : "會員建檔失敗");
+        setError(submitError instanceof Error ? submitError.message : "建立會員失敗。");
       }
     });
   }
@@ -87,49 +94,71 @@ export default function MobileMemberCreatePage() {
     <section className="mobile-stack">
       <article className="hero-card compact">
         <p className="eyebrow">Member intake</p>
-        <h2>手機會員建檔</h2>
-        <p>可先掃會員證條碼，再補姓名、電話、單位。會員照片現在會正式保存，之後進編輯頁可回看。</p>
+        <h2>會員建檔</h2>
+        <p>可掃會員條碼、手動補資料，也能直接用桌機 webcam 或手機相機拍會員照片。</p>
       </article>
 
       <section className="action-grid compact">
         <Link href="/mobile/members" className="action-card">
-          <div className="action-badge">查看</div>
-          <h3>看會員清單</h3>
-          <p>如果想確認資料有沒有建成功，直接進會員清單查看。</p>
+          <div className="action-badge">會員</div>
+          <h3>查看會員清單</h3>
+          <p>建檔完成後可回清單確認會員資料與照片。</p>
         </Link>
       </section>
 
       <BarcodeScanner
-        label="掃會員證條碼"
-        helperText="如果讀者卡上有條碼，可先掃進會員編號；沒有的話也可以手動輸入。"
+        label="掃描會員條碼"
+        helperText="如果會員卡上已有條碼，可以先掃入當作會員編號。"
         onDetected={handleMemberCodeDetected}
       />
 
       <form className="mobile-form" onSubmit={handleSubmit}>
         <label className="field">
           <span>會員編號</span>
-          <input value={memberCode} onChange={(event) => setMemberCode(event.target.value)} placeholder="例如 M0002" autoCapitalize="characters" required />
+          <input
+            value={memberCode}
+            onChange={(event) => setMemberCode(event.target.value)}
+            placeholder="例如 M0002"
+            autoCapitalize="characters"
+            required
+          />
         </label>
+
         <label className="field">
           <span>姓名</span>
-          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如 王小華" required />
+          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如 王小明" required />
         </label>
+
         <label className="field">
           <span>電話</span>
           <input value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="例如 0912345678" inputMode="tel" />
         </label>
+
         <label className="field">
           <span>Email</span>
-          <input value={email} onChange={(event) => setEmail(event.target.value)} placeholder="例如 reader@example.com" inputMode="email" />
+          <input
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            placeholder="reader@example.com"
+            inputMode="email"
+          />
         </label>
+
         <label className="field">
-          <span>單位 / 班級</span>
-          <input value={unitName} onChange={(event) => setUnitName(event.target.value)} placeholder="例如 圖書室 / 三年甲班" />
+          <span>班級 / 單位</span>
+          <input
+            value={unitName}
+            onChange={(event) => setUnitName(event.target.value)}
+            placeholder="例如 三年甲班 / 志工組"
+          />
         </label>
+
         <label className="field">
-          <span>拍會員照片</span>
-          <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} />
+          <span>會員照片</span>
+          <input type="file" accept="image/*" onChange={handlePhotoChange} />
         </label>
+
+        <CameraCapture label="拍會員照片" onCapture={setCapturedPhoto} />
 
         {photoPreview ? (
           <div className="cover-preview-card">
@@ -139,11 +168,16 @@ export default function MobileMemberCreatePage() {
 
         <label className="field">
           <span>備註</span>
-          <textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="例如 新辦證、家長代借" rows={4} />
+          <textarea
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder="例如 特殊身份、證件備註或聯絡說明"
+            rows={4}
+          />
         </label>
 
         <button type="submit" className="primary-button" disabled={isPending}>
-          {isPending ? "建檔中..." : "建立會員"}
+          {isPending ? "建立中..." : "建立會員"}
         </button>
       </form>
 
@@ -151,11 +185,14 @@ export default function MobileMemberCreatePage() {
         <div className="feedback success">
           <div>{message}</div>
           <div className="feedback-link-row">
-            <Link href="/mobile/members" className="inline-link">看全部會員</Link>
+            <Link href="/mobile/members" className="inline-link">
+              查看全部會員
+            </Link>
             {createdMemberId ? <span className="feedback-meta">ID: {createdMemberId}</span> : null}
           </div>
         </div>
       ) : null}
+
       {error ? <div className="feedback error">{error}</div> : null}
     </section>
   );

@@ -5,6 +5,7 @@ const navItems = [
   { href: "/mobile/loan", label: "借還" },
   { href: "/mobile/books", label: "書籍" },
   { href: "/mobile/members", label: "會員" },
+  { href: "/mobile/inventory", label: "盤點" },
 ];
 
 export default function MobileLayout({
@@ -16,10 +17,10 @@ export default function MobileLayout({
         <header className="mobile-header">
           <div>
             <p className="eyebrow">Library PWA</p>
-            <h1 className="mobile-title">館員行動工作台</h1>
+            <h1 className="mobile-title">行動圖書管理</h1>
           </div>
           <Link href="/" className="mini-link">
-            總覽
+            首頁
           </Link>
         </header>
 

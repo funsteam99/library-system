@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useState, useTransition } from "react";
 
+import { CameraCapture } from "../../../../components/camera-capture";
 import { apiRequest } from "../../../../lib/api";
 import { uploadImage } from "../../../../lib/upload";
 
@@ -45,7 +46,10 @@ export default function MobileMemberEditPage() {
     async function loadMember() {
       try {
         const data = await apiRequest<MemberDetailResponse>(`/api/members/${params.id}`);
-        if (!active) return;
+        if (!active) {
+          return;
+        }
+
         setMemberCode(data.item.memberCode);
         setName(data.item.name);
         setPhone(data.item.phone ?? "");
@@ -58,7 +62,7 @@ export default function MobileMemberEditPage() {
         setError(null);
       } catch (loadError) {
         if (active) {
-          setError(loadError instanceof Error ? loadError.message : "會員資料載入失敗");
+          setError(loadError instanceof Error ? loadError.message : "讀取會員資料失敗。");
         }
       } finally {
         if (active) {
@@ -68,24 +72,30 @@ export default function MobileMemberEditPage() {
     }
 
     void loadMember();
+
     return () => {
       active = false;
     };
   }, [params.id]);
 
-  function handlePhotoChange(event: React.ChangeEvent<HTMLInputElement>) {
+  function setCapturedPhoto(file: File, previewUrl: string) {
+    setPhotoFile(file);
+    setPhotoPreview(previewUrl);
+  }
+
+  function handlePhotoChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+
     if (!file) {
       setPhotoFile(null);
       setPhotoPreview(photoUrl);
       return;
     }
 
-    setPhotoFile(file);
-    setPhotoPreview(URL.createObjectURL(file));
+    setCapturedPhoto(file, URL.createObjectURL(file));
   }
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMessage(null);
     setError(null);
@@ -113,10 +123,10 @@ export default function MobileMemberEditPage() {
           }),
         });
 
-        setMessage("會員資料已更新");
+        setMessage("會員資料已更新。");
         router.push("/mobile/members");
       } catch (submitError) {
-        setError(submitError instanceof Error ? submitError.message : "會員更新失敗");
+        setError(submitError instanceof Error ? submitError.message : "更新會員失敗。");
       }
     });
   }
@@ -126,14 +136,14 @@ export default function MobileMemberEditPage() {
       <article className="hero-card compact">
         <p className="eyebrow">Edit member</p>
         <h2>編輯會員</h2>
-        <p>修改會員編號、姓名、電話與狀態。存檔後會回到會員清單。</p>
+        <p>可重新拍會員照片、調整聯絡資料與狀態，儲存後會回到會員清單。</p>
       </article>
 
       <section className="action-grid compact">
         <Link href="/mobile/members" className="action-card">
           <div className="action-badge">返回</div>
-          <h3>回會員清單</h3>
-          <p>不修改時可直接回到清單查看其他會員。</p>
+          <h3>回到會員清單</h3>
+          <p>如果只想查看當前資料，先回清單也可以。</p>
         </Link>
       </section>
 
@@ -146,31 +156,40 @@ export default function MobileMemberEditPage() {
             <span>會員編號</span>
             <input value={memberCode} onChange={(event) => setMemberCode(event.target.value)} required />
           </label>
+
           <label className="field">
             <span>姓名</span>
             <input value={name} onChange={(event) => setName(event.target.value)} required />
           </label>
+
           <label className="field">
             <span>電話</span>
             <input value={phone} onChange={(event) => setPhone(event.target.value)} />
           </label>
+
           <label className="field">
             <span>Email</span>
             <input value={email} onChange={(event) => setEmail(event.target.value)} />
           </label>
+
           <label className="field">
-            <span>單位 / 班級</span>
+            <span>班級 / 單位</span>
             <input value={unitName} onChange={(event) => setUnitName(event.target.value)} />
           </label>
+
           <label className="field">
             <span>會員照片</span>
-            <input type="file" accept="image/*" capture="environment" onChange={handlePhotoChange} />
+            <input type="file" accept="image/*" onChange={handlePhotoChange} />
           </label>
+
+          <CameraCapture label="重新拍會員照片" onCapture={setCapturedPhoto} />
+
           {photoPreview ? (
             <div className="cover-preview-card">
               <img src={photoPreview} alt="會員照片預覽" className="cover-preview-image" />
             </div>
           ) : null}
+
           <label className="field">
             <span>狀態</span>
             <select value={status} onChange={(event) => setStatus(event.target.value)} className="field-select">
@@ -178,12 +197,14 @@ export default function MobileMemberEditPage() {
               <option value="inactive">inactive</option>
             </select>
           </label>
+
           <label className="field">
             <span>備註</span>
             <textarea value={note} onChange={(event) => setNote(event.target.value)} rows={4} />
           </label>
+
           <button type="submit" className="primary-button" disabled={isPending}>
-            {isPending ? "儲存中..." : "儲存變更"}
+            {isPending ? "更新中..." : "儲存變更"}
           </button>
         </form>
       ) : null}
