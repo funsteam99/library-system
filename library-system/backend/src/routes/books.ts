@@ -8,8 +8,10 @@ import { parseId } from "../lib/parse-int.js";
 import { mapBook } from "../features/books/mapper.js";
 import {
   createBook,
+  getBookByAccessionCode,
   getBookByBarcode,
   getBookById,
+  listBooksByIsbn,
   listBooks,
   updateBook,
 } from "../features/books/repository.js";
@@ -32,11 +34,34 @@ booksRouter.get(
     const isbn = requireParam(req.params.isbn, "isbn");
     const item = await lookupBookByIsbn(isbn);
 
-    if (!item) {
-      throw new HttpError(404, "No metadata found for this ISBN");
-    }
+    res.json({
+      item,
+      found: Boolean(item),
+      message: item ? null : "No metadata found for this ISBN",
+    });
+  }),
+);
 
-    res.json({ item });
+booksRouter.get(
+  "/check",
+  asyncHandler(async (req, res) => {
+    const isbn = typeof req.query.isbn === "string" ? req.query.isbn.trim() : "";
+    const accessionCode =
+      typeof req.query.accessionCode === "string" ? req.query.accessionCode.trim() : "";
+
+    const [isbnMatches, accessionMatch] = await Promise.all([
+      isbn ? listBooksByIsbn(isbn) : Promise.resolve([]),
+      accessionCode ? getBookByAccessionCode(accessionCode) : Promise.resolve(null),
+    ]);
+
+    res.json({
+      item: {
+        isbn,
+        accessionCode,
+        isbnMatches: isbnMatches.map(mapBook),
+        accessionMatch: accessionMatch ? mapBook(accessionMatch) : null,
+      },
+    });
   }),
 );
 
@@ -73,6 +98,12 @@ booksRouter.post(
   asyncHandler(async (req, res) => {
     try {
       const input = createBookSchema.parse(req.body);
+      const duplicatedAccession = await getBookByAccessionCode(input.accessionCode);
+
+      if (duplicatedAccession) {
+        throw new HttpError(409, "Accession code already exists");
+      }
+
       const row = await createBook(input);
 
       res.status(201).json({ item: mapBook(row) });

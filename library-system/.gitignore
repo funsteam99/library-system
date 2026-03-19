@@ -1,11 +1,13 @@
 backend/node_modules/
 backend/dist/
+backend/.env
 backend/backend-dev.log
 backend/uploads/
 
 frontend/node_modules/
 frontend/.next/
 frontend/frontend-dev.log
+frontend/tsconfig.tsbuildinfo
 
 infra/caddy/caddy.log
 infra/caddy/rootCA.pem

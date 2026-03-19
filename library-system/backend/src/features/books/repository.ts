@@ -74,6 +74,30 @@ export async function getBookByBarcode(code: string) {
   return result.rows[0] ?? null;
 }
 
+export async function getBookByAccessionCode(accessionCode: string) {
+  const result = await query<BookRow>(
+    `SELECT *
+     FROM books
+     WHERE accession_code = $1
+     LIMIT 1`,
+    [accessionCode],
+  );
+
+  return result.rows[0] ?? null;
+}
+
+export async function listBooksByIsbn(isbn: string) {
+  const result = await query<BookRow>(
+    `SELECT *
+     FROM books
+     WHERE isbn = $1
+     ORDER BY id DESC`,
+    [isbn],
+  );
+
+  return result.rows;
+}
+
 export async function createBook(input: CreateBookInput) {
   const result = await query<BookRow>(
     `INSERT INTO books (

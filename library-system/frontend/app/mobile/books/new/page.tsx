@@ -15,6 +15,24 @@ type LookupResponse = {
     publishYear: number | null;
     coverUrl: string | null;
     source: string | null;
+  } | null;
+  found: boolean;
+  message: string | null;
+};
+
+type BookSummary = {
+  id: number;
+  title: string;
+  accessionCode: string;
+  isbn: string | null;
+};
+
+type DuplicateCheckResponse = {
+  item: {
+    isbn: string;
+    accessionCode: string;
+    isbnMatches: BookSummary[];
+    accessionMatch: BookSummary | null;
   };
 };
 
@@ -39,6 +57,9 @@ export default function MobileBookCreatePage() {
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [lookupMessage, setLookupMessage] = useState<string | null>(null);
+  const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null);
+  const [duplicateBooks, setDuplicateBooks] = useState<BookSummary[]>([]);
+  const [hasAccessionConflict, setHasAccessionConflict] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [createdBookId, setCreatedBookId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,6 +79,48 @@ export default function MobileBookCreatePage() {
     return "先掃 ISBN 取得書目資料，再掃館藏條碼會最快。";
   }, [accessionCode, isbn]);
 
+  async function checkDuplicates(nextIsbn: string, nextAccessionCode: string) {
+    const normalizedIsbn = nextIsbn.replace(/[^0-9Xx]/g, "");
+    const normalizedAccessionCode = nextAccessionCode.trim();
+
+    if (!normalizedIsbn && !normalizedAccessionCode) {
+      setDuplicateMessage(null);
+      setDuplicateBooks([]);
+      setHasAccessionConflict(false);
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (normalizedIsbn) {
+      params.set("isbn", normalizedIsbn);
+    }
+    if (normalizedAccessionCode) {
+      params.set("accessionCode", normalizedAccessionCode);
+    }
+
+    try {
+      const payload = await apiRequest<DuplicateCheckResponse>(`/api/books/check?${params.toString()}`);
+      const messages: string[] = [];
+
+      setDuplicateBooks(payload.item.isbnMatches);
+      setHasAccessionConflict(Boolean(payload.item.accessionMatch));
+
+      if (payload.item.isbnMatches.length > 0) {
+        messages.push(`此 ISBN 已有 ${payload.item.isbnMatches.length} 本館藏紀錄。`);
+      }
+
+      if (payload.item.accessionMatch) {
+        messages.push(`館藏條碼 ${payload.item.accessionCode} 已被《${payload.item.accessionMatch.title}》使用。`);
+      }
+
+      setDuplicateMessage(messages.length > 0 ? messages.join(" ") : null);
+    } catch {
+      setDuplicateMessage(null);
+      setDuplicateBooks([]);
+      setHasAccessionConflict(false);
+    }
+  }
+
   async function lookupIsbnMetadata(targetIsbn: string) {
     const normalized = targetIsbn.replace(/[^0-9Xx]/g, "");
 
@@ -67,6 +130,7 @@ export default function MobileBookCreatePage() {
     }
 
     if (normalized === lastLookedUpIsbn.current) {
+      await checkDuplicates(normalized, accessionCode || normalized);
       return;
     }
 
@@ -78,37 +142,39 @@ export default function MobileBookCreatePage() {
       try {
         const payload = await apiRequest<LookupResponse>(`/api/books/lookup/isbn/${normalized}`);
 
-        if (payload.item.title && !title) {
+        if (payload.item?.title && !title) {
           setTitle(payload.item.title);
         }
-
-        if (payload.item.author && !author) {
+        if (payload.item?.author && !author) {
           setAuthor(payload.item.author);
         }
-
-        if (payload.item.publisher && !publisher) {
+        if (payload.item?.publisher && !publisher) {
           setPublisher(payload.item.publisher);
         }
-
-        if (payload.item.publishYear && !publishYear) {
+        if (payload.item?.publishYear && !publishYear) {
           setPublishYear(String(payload.item.publishYear));
         }
-
-        if (payload.item.coverUrl && !coverFile) {
+        if (payload.item?.coverUrl && !coverFile) {
           setCoverPreview(payload.item.coverUrl);
         }
 
-        const sourceLabel =
-          payload.item.source === "openlibrary"
-            ? "Open Library"
-            : payload.item.source === "googlebooks"
-              ? "Google Books"
-              : "外部書目";
+        if (payload.found && payload.item) {
+          const sourceLabel =
+            payload.item.source === "openlibrary"
+              ? "Open Library"
+              : payload.item.source === "googlebooks"
+                ? "Google Books"
+                : "外部書目";
 
-        setLookupMessage(`已自動帶入書籍資料，來源：${sourceLabel}。`);
-      } catch (lookupError) {
+          setLookupMessage(`已自動帶入書籍資料，來源：${sourceLabel}。`);
+        } else {
+          setLookupMessage("查不到外部書目資料，請直接手動輸入書名與作者。");
+        }
+      } catch {
         lastLookedUpIsbn.current = "";
-        setLookupMessage(lookupError instanceof Error ? lookupError.message : "查詢 ISBN 失敗。");
+        setLookupMessage("目前無法查詢外部書目，請先手動輸入資料。");
+      } finally {
+        await checkDuplicates(normalized, accessionCode || normalized);
       }
     });
   }
@@ -123,10 +189,15 @@ export default function MobileBookCreatePage() {
     }
 
     setAccessionCode(code);
+    void checkDuplicates(isbn, code);
   }
 
   function handleIsbnBlur() {
     void lookupIsbnMetadata(isbn);
+  }
+
+  function handleAccessionBlur() {
+    void checkDuplicates(isbn, accessionCode);
   }
 
   function handleCoverChange(event: ChangeEvent<HTMLInputElement>) {
@@ -147,6 +218,11 @@ export default function MobileBookCreatePage() {
     setMessage(null);
     setError(null);
     setCreatedBookId(null);
+
+    if (hasAccessionConflict) {
+      setError("館藏條碼已重複，請先更換條碼再建檔。");
+      return;
+    }
 
     startTransition(async () => {
       try {
@@ -176,6 +252,9 @@ export default function MobileBookCreatePage() {
 
         setCreatedBookId(payload.item.id);
         setMessage(`已建立《${payload.item.title}》，館藏條碼為 ${payload.item.accessionCode}。`);
+        setDuplicateMessage(null);
+        setDuplicateBooks([]);
+        setHasAccessionConflict(false);
       } catch (submitError) {
         setError(submitError instanceof Error ? submitError.message : "建立書籍失敗。");
       }
@@ -187,14 +266,14 @@ export default function MobileBookCreatePage() {
       <article className="hero-card compact">
         <p className="eyebrow">Book intake</p>
         <h2>書籍建檔</h2>
-        <p>先掃 ISBN 自動帶入書名、作者、出版社與出版年，再補館藏條碼與備註即可完成建檔。</p>
+        <p>先掃 ISBN 嘗試帶入書目，再補館藏條碼與封面，就能完成建檔。</p>
       </article>
 
       <section className="action-grid compact">
         <Link href="/mobile/books" className="action-card">
           <div className="action-badge">書籍</div>
           <h3>查看書籍清單</h3>
-          <p>建檔完成後可直接回清單檢查封面、條碼與基本資料。</p>
+          <p>建檔完成後可直接回清單確認資料是否正確。</p>
         </Link>
       </section>
 
@@ -235,10 +314,26 @@ export default function MobileBookCreatePage() {
           <input
             value={accessionCode}
             onChange={(event) => setAccessionCode(event.target.value)}
+            onBlur={handleAccessionBlur}
             placeholder="例如 B0002，留空則沿用 ISBN"
             autoCapitalize="characters"
           />
         </label>
+
+        {duplicateMessage ? (
+          <div className={`feedback ${hasAccessionConflict ? "error" : ""}`}>{duplicateMessage}</div>
+        ) : null}
+
+        {duplicateBooks.length > 0 ? (
+          <div className="feedback">
+            <div>同 ISBN 館藏：</div>
+            {duplicateBooks.slice(0, 3).map((book) => (
+              <div key={book.id}>
+                《{book.title}》 / 館藏碼 {book.accessionCode}
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         <label className="field">
           <span>書名</span>
@@ -297,7 +392,7 @@ export default function MobileBookCreatePage() {
           />
         </label>
 
-        <button type="submit" className="primary-button" disabled={isPending}>
+        <button type="submit" className="primary-button" disabled={isPending || hasAccessionConflict}>
           {isPending ? "建立中..." : "建立書籍"}
         </button>
       </form>
