@@ -10,7 +10,7 @@ export const createBookSchema = z.object({
   categoryId: z.number().int().positive().optional().nullable(),
   shelfId: z.number().int().positive().optional().nullable(),
   coverUrl: z.string().trim().max(255).optional().nullable(),
-  status: z.enum(["available", "loaned", "lost", "repair", "inventory"]).optional(),
+  status: z.enum(["available", "loaned", "lost", "repair", "inventory", "inactive"]).optional(),
   conditionNote: z.string().trim().optional().nullable(),
   source: z.string().trim().max(50).optional().nullable(),
   price: z.number().nonnegative().optional().nullable(),

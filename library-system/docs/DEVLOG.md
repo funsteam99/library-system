@@ -1,64 +1,144 @@
 # DEVLOG
 
-## 目前狀態
+## 專案現況
 
-專案已從規格文件推進到可操作的 MVP。
+這是一套手機優先的圖書管理 MVP，核心已可運作於：
+- 本機 Windows 開發環境
+- 內網 HTTPS
+- 手機 Safari / Chrome 掃碼流程
+- 可延伸到 Docker / NAS 部署
 
-### 已完成
+## 已完成
 
-- 建立 PostgreSQL 資料庫 `library_system`
-- 匯入核心 schema
-- 建立本機測試 seed
-- 建立 Express API 骨架
-- 完成書籍 / 會員 / 借還書 API
-- 建立 Next.js 手機端 PWA 骨架
-- 完成手機借書 / 還書
-- 完成手機書籍清單 / 建檔 / 編輯
-- 完成手機會員清單 / 建檔 / 編輯
-- 完成 iPhone 可用的內網 HTTPS
-- 完成手機相機掃碼
+### 基礎架構
+- PostgreSQL 資料庫 `library_system`
+- Express + TypeScript backend
+- Next.js frontend
+- Caddy 內網 HTTPS
+- GitHub repo 與 `main` 分支工作流
 
-## 重要路徑
+### 手機 PWA
+- `/mobile`
+- `/mobile/books`
+- `/mobile/books/new`
+- `/mobile/books/[id]/edit`
+- `/mobile/members`
+- `/mobile/members/new`
+- `/mobile/members/[id]/edit`
+- `/mobile/loan`
+- `/mobile/return`
+- `/mobile/inventory`
 
-### 核心文件
+### 書籍功能
+- 書籍建檔
+- 書籍清單
+- 書籍編輯
+- 封面上傳與 webcam 拍照
+- ISBN metadata lookup
+- ISBN / 館藏條碼重複檢查
+- 清單封面縮圖
+- 書籍狀態管理
 
-- [README.md](C:\Users\user\Documents\Playground\library-system\README.md)
-- [library-mvp-spec-v1.md](C:\Users\user\Documents\Playground\docs\library-mvp-spec-v1.md)
+### 會員功能
+- 會員建檔
+- 會員清單
+- 會員編輯
+- 會員照片上傳與 webcam 拍照
 
-### 資料庫
+### 流通功能
+- 借書
+- 還書
+- 借閱 API
 
-- [schema.sql](C:\Users\user\Documents\Playground\library-system\database\schema.sql)
-- [dev-seed.sql](C:\Users\user\Documents\Playground\library-system\database\dev-seed.sql)
+### 盤點
+- 建立盤點批次
+- 掃描館藏條碼
+- 完成盤點批次
 
-### HTTPS
+## ISBN metadata 現況
 
-- [Caddyfile](C:\Users\user\Documents\Playground\library-system\infra\caddy\Caddyfile)
-- [rootCA.pem](C:\Users\user\Documents\Playground\library-system\infra\caddy\rootCA.pem)
+### Primary
+- Open Library
+- Google Books
 
-## 服務與 log
+### Fallback
+- 讀冊
+- 博客來
+- Amazon
+- Amazon.co.jp
+- CiNii Books
 
-### 開發服務
+### 已驗證案例
+- `9789866535581`
+  - 可帶出：書名、作者、出版社、出版年
+- `9784899773993`
+  - 可帶出：日文書名、作者、出版年、封面
 
-- 前端 dev：`http://localhost:3000`
-- 後端 dev：`http://localhost:4000`
-- 手機 HTTPS：`https://192.168.0.112`
+## 狀態管理方向
 
-### log 檔
+本系統目前採：
+- 不做硬刪除
+- 用書籍狀態管理生命週期
 
-- [backend-dev.log](C:\Users\user\Documents\Playground\library-system\backend\backend-dev.log)
-- [frontend-dev.log](C:\Users\user\Documents\Playground\library-system\frontend\frontend-dev.log)
-- [caddy.log](C:\Users\user\Documents\Playground\library-system\infra\caddy\caddy.log)
+可用狀態：
+- `available`
+- `loaned`
+- `lost`
+- `repair`
+- `inventory`
+- `inactive`
 
-## 已知問題
+## 重要檔案
 
-- Windows PowerShell 直接送中文 JSON 到 API 時，終端回傳可能出現亂碼
-- 封面 / 會員照片目前只有前端預覽，尚未做正式上傳
-- `inventory` 盤點流程尚未開始
-- 行動端尚未加入搜尋 / 篩選 / 詳細頁
+### 文件
+- [README.md](/C:/Users/user/Documents/Playground/library-system/README.md)
+- [library-mvp-spec-v1.md](/C:/Users/user/Documents/Playground/docs/library-mvp-spec-v1.md)
 
-## 建議下一步
+### Backend
+- [app.ts](/C:/Users/user/Documents/Playground/library-system/backend/src/app.ts)
+- [books.ts](/C:/Users/user/Documents/Playground/library-system/backend/src/routes/books.ts)
+- [members.ts](/C:/Users/user/Documents/Playground/library-system/backend/src/routes/members.ts)
+- [loans.ts](/C:/Users/user/Documents/Playground/library-system/backend/src/routes/loans.ts)
+- [inventory.ts](/C:/Users/user/Documents/Playground/library-system/backend/src/routes/inventory.ts)
+- [uploads.ts](/C:/Users/user/Documents/Playground/library-system/backend/src/routes/uploads.ts)
+- [isbn-lookup.ts](/C:/Users/user/Documents/Playground/library-system/backend/src/features/books/isbn-lookup.ts)
+- [isbn-lookup-cdp.ts](/C:/Users/user/Documents/Playground/library-system/backend/src/features/books/isbn-lookup-cdp.ts)
 
-1. 做盤點功能第一版
-2. 補書籍 / 會員搜尋與篩選
-3. 做照片正式上傳
-4. 處理中文編碼驗證與資料清洗
+### Database
+- [schema.sql](/C:/Users/user/Documents/Playground/library-system/database/schema.sql)
+- [dev-seed.sql](/C:/Users/user/Documents/Playground/library-system/database/dev-seed.sql)
+- [20260320_add_inactive_book_status.sql](/C:/Users/user/Documents/Playground/library-system/database/migrations/20260320_add_inactive_book_status.sql)
+
+### Frontend
+- [mobile books new](/C:/Users/user/Documents/Playground/library-system/frontend/app/mobile/books/new/page.tsx)
+- [mobile books list](/C:/Users/user/Documents/Playground/library-system/frontend/app/mobile/books/page.tsx)
+- [mobile books edit](/C:/Users/user/Documents/Playground/library-system/frontend/app/mobile/books/[id]/edit/page.tsx)
+- [camera capture](/C:/Users/user/Documents/Playground/library-system/frontend/app/components/camera-capture.tsx)
+- [barcode scanner](/C:/Users/user/Documents/Playground/library-system/frontend/app/components/barcode-scanner.tsx)
+
+## 本機服務
+
+- Frontend: `http://localhost:3000`
+- Backend: `http://localhost:4000`
+- HTTPS entry: `https://192.168.0.112`
+
+## Log 位置
+
+- [backend-dev.log](/C:/Users/user/Documents/Playground/library-system/backend/backend-dev.log)
+- [frontend-dev.log](/C:/Users/user/Documents/Playground/library-system/frontend/frontend-dev.log)
+- [caddy.log](/C:/Users/user/Documents/Playground/library-system/infra/caddy/caddy.log)
+
+## 已知限制
+
+- 某些站點 metadata 不完整
+- 某些封面圖仍可能抓不到
+- 中文與日文來源需持續補強
+- 尚未提供 Docker Compose 正式部署檔
+
+## 下一步建議
+
+1. 補 `Docker Compose / NAS` 正式部署檔
+2. 補盤點差異清單與匯出
+3. 補借閱紀錄查詢頁
+4. 補書籍 / 會員更多篩選
+5. 補 README 的 Docker / NAS 實作稿

@@ -2,33 +2,51 @@
 
 Next.js App Router 手機優先 PWA。
 
-## 啟動
+## 安裝
 
 ```bash
 npm install
+```
+
+## 啟動
+
+```bash
 npm run dev
 ```
 
-## 目前頁面
+## 主要頁面
 
 - `/`
 - `/mobile`
-- `/mobile/loan`
-- `/mobile/return`
 - `/mobile/books`
 - `/mobile/books/new`
 - `/mobile/books/:id/edit`
 - `/mobile/members`
 - `/mobile/members/new`
 - `/mobile/members/:id/edit`
+- `/mobile/loan`
+- `/mobile/return`
+- `/mobile/inventory`
 
-## API 呼叫
+## 相機與掃碼
 
-前端目前預設走同源 `/api`，因此：
+- ISBN / 條碼掃描：`html5-qrcode`
+- 封面 / 會員照片：browser webcam + file upload
+- iPhone 掃碼需 `HTTPS`
+- 桌機 webcam 會先嘗試 `2x` 變焦
 
-- 本機開發可透過前端 dev server + Caddy / 同網域代理使用
-- 手機內網 HTTPS 可直接呼叫同一個主機上的 `/api`
+## API
 
-## 本機開發 log
+前端預設走同源 `/api`。
 
-- [frontend-dev.log](C:\Users\user\Documents\Playground\library-system\frontend\frontend-dev.log)
+開發模式常見組合：
+- `frontend`: `http://localhost:3000`
+- `backend`: `http://localhost:4000`
+- 內網入口：`https://192.168.0.112`
+
+若用 Caddy 代理，手機可直接走：
+- `https://192.168.0.112/mobile`
+
+## 開發 log
+
+- [frontend-dev.log](/C:/Users/user/Documents/Playground/library-system/frontend/frontend-dev.log)

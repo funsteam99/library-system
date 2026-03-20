@@ -30,7 +30,7 @@ type CreateBookInput = {
   categoryId?: number | null;
   shelfId?: number | null;
   coverUrl?: string | null;
-  status?: "available" | "loaned" | "lost" | "repair" | "inventory";
+  status?: "available" | "loaned" | "lost" | "repair" | "inventory" | "inactive";
   conditionNote?: string | null;
   source?: string | null;
   price?: number | null;

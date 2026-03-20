@@ -2,32 +2,60 @@
 
 Express + TypeScript + PostgreSQL API。
 
-## 啟動
+## 安裝
 
 ```bash
 npm install
-npm run dev
 ```
 
-預設 `.env`：
+建立 `.env`：
 
 ```env
 PORT=4000
-DATABASE_URL=postgres://postgres:***@localhost:5432/library_system
+DATABASE_URL=postgres://postgres:YOUR_PASSWORD@localhost:5432/library_system
 CORS_ORIGIN=http://localhost:3000
 ```
 
-## 目前模組
+## 啟動
+
+```bash
+npm run dev
+```
+
+編譯檢查：
+
+```bash
+npm run build
+```
+
+## API 範圍
 
 - `books`
 - `members`
 - `loans`
-- `inventory` placeholder
+- `inventory`
+- `uploads`
 - `health`
 
-## 已完成 API
+## ISBN lookup
 
+Primary:
+- Open Library
+- Google Books
+
+Fallback:
+- 讀冊
+- 博客來
+- Amazon
+- Amazon.co.jp
+- CiNii Books
+
+## 常用端點
+
+- `GET /api/health`
 - `GET /api/books`
+- `GET /api/books/check`
+- `GET /api/books/lookup/isbn/:isbn`
 - `POST /api/books`
 - `PATCH /api/books/:id`
 - `GET /api/members`
@@ -37,7 +65,32 @@ CORS_ORIGIN=http://localhost:3000
 - `GET /api/loans/overdue`
 - `POST /api/loans/checkout`
 - `POST /api/loans/return`
+- `GET /api/inventory/sessions`
+- `POST /api/inventory/sessions`
+- `POST /api/inventory/sessions/:id/scan`
+- `POST /api/uploads/book-cover`
+- `POST /api/uploads/member-photo`
 
-## 本機開發 log
+## 資料庫
 
-- [backend-dev.log](C:\Users\user\Documents\Playground\library-system\backend\backend-dev.log)
+先建立 `library_system`，再匯入：
+
+```bash
+psql -U postgres -d library_system -f ../database/schema.sql
+```
+
+如需測試資料：
+
+```bash
+psql -U postgres -d library_system -f ../database/dev-seed.sql
+```
+
+如果要補 `inactive` 書籍狀態：
+
+```bash
+psql -U postgres -d library_system -f ../database/migrations/20260320_add_inactive_book_status.sql
+```
+
+## 開發 log
+
+- [backend-dev.log](/C:/Users/user/Documents/Playground/library-system/backend/backend-dev.log)

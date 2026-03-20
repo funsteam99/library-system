@@ -2,11 +2,25 @@
 
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { type ChangeEvent, type FormEvent, useEffect, useState, useTransition } from "react";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  useEffect,
+  useState,
+  useTransition,
+} from "react";
 
 import { CameraCapture } from "../../../../components/camera-capture";
 import { apiRequest } from "../../../../lib/api";
 import { uploadImage } from "../../../../lib/upload";
+
+type BookStatus =
+  | "available"
+  | "loaned"
+  | "lost"
+  | "repair"
+  | "inventory"
+  | "inactive";
 
 type BookDetailResponse = {
   item: {
@@ -18,9 +32,19 @@ type BookDetailResponse = {
     publisher: string | null;
     publishYear: number | null;
     coverUrl: string | null;
+    status: BookStatus;
     remark: string | null;
   };
 };
+
+const statusOptions: Array<{ value: BookStatus; label: string }> = [
+  { value: "available", label: "在館可借" },
+  { value: "loaned", label: "借出中" },
+  { value: "lost", label: "遺失" },
+  { value: "repair", label: "維修中" },
+  { value: "inventory", label: "盤點中" },
+  { value: "inactive", label: "下架停用" },
+];
 
 export default function MobileBookEditPage() {
   const params = useParams<{ id: string }>();
@@ -31,6 +55,7 @@ export default function MobileBookEditPage() {
   const [author, setAuthor] = useState("");
   const [publisher, setPublisher] = useState("");
   const [publishYear, setPublishYear] = useState("");
+  const [status, setStatus] = useState<BookStatus>("available");
   const [remark, setRemark] = useState("");
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
@@ -56,6 +81,7 @@ export default function MobileBookEditPage() {
         setAuthor(data.item.author ?? "");
         setPublisher(data.item.publisher ?? "");
         setPublishYear(data.item.publishYear ? String(data.item.publishYear) : "");
+        setStatus(data.item.status);
         setRemark(data.item.remark ?? "");
         setCoverUrl(data.item.coverUrl ?? null);
         setCoverPreview(data.item.coverUrl ?? null);
@@ -119,6 +145,7 @@ export default function MobileBookEditPage() {
             publisher: publisher || null,
             publishYear: publishYear ? Number(publishYear) : null,
             coverUrl: nextCoverUrl,
+            status,
             remark: remark || null,
           }),
         });
@@ -136,14 +163,14 @@ export default function MobileBookEditPage() {
       <article className="hero-card compact">
         <p className="eyebrow">Edit book</p>
         <h2>編輯書籍</h2>
-        <p>桌機可直接用 webcam 重新拍封面，更新後會回到書籍清單。</p>
+        <p>狀態管理會取代刪除，用來表示借出、遺失、維修或下架。</p>
       </article>
 
       <section className="action-grid compact">
         <Link href="/mobile/books" className="action-card">
-          <div className="action-badge">返回</div>
+          <div className="action-badge">書籍</div>
           <h3>回到書籍清單</h3>
-          <p>若只想查看目前資料，可先回清單再重新進入。</p>
+          <p>存檔後可回清單確認狀態與封面是否正確。</p>
         </Link>
       </section>
 
@@ -159,7 +186,11 @@ export default function MobileBookEditPage() {
 
           <label className="field">
             <span>館藏條碼</span>
-            <input value={accessionCode} onChange={(event) => setAccessionCode(event.target.value)} required />
+            <input
+              value={accessionCode}
+              onChange={(event) => setAccessionCode(event.target.value)}
+              required
+            />
           </label>
 
           <label className="field">
@@ -189,6 +220,21 @@ export default function MobileBookEditPage() {
           </label>
 
           <label className="field">
+            <span>狀態</span>
+            <select
+              className="field-select"
+              value={status}
+              onChange={(event) => setStatus(event.target.value as BookStatus)}
+            >
+              {statusOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field">
             <span>封面照片</span>
             <input type="file" accept="image/*" onChange={handleCoverChange} />
           </label>
@@ -203,7 +249,11 @@ export default function MobileBookEditPage() {
 
           <label className="field">
             <span>備註</span>
-            <textarea value={remark} onChange={(event) => setRemark(event.target.value)} rows={4} />
+            <textarea
+              value={remark}
+              onChange={(event) => setRemark(event.target.value)}
+              rows={4}
+            />
           </label>
 
           <button type="submit" className="primary-button" disabled={isPending}>

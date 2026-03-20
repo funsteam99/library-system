@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS books (
   created_at TIMESTAMP NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
   CONSTRAINT books_status_check CHECK (
-    status IN ('available', 'loaned', 'lost', 'repair', 'inventory')
+    status IN ('available', 'loaned', 'lost', 'repair', 'inventory', 'inactive')
   )
 );
 
