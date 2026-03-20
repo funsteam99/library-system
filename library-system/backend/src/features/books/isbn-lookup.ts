@@ -1,10 +1,17 @@
+import { lookupBookByIsbnCdp, type IsbnLookupDebugCandidate } from "./isbn-lookup-cdp.js";
+
 type IsbnLookupResult = {
   title: string | null;
   author: string | null;
   publisher: string | null;
   publishYear: number | null;
   coverUrl: string | null;
-  source: "openlibrary" | "googlebooks" | null;
+  source: "openlibrary" | "googlebooks" | "cdp-search" | null;
+};
+
+export type IsbnLookupResponse = {
+  item: IsbnLookupResult | null;
+  debugCandidates: IsbnLookupDebugCandidate[];
 };
 
 function normalizeCoverUrl(value: string | null | undefined) {
@@ -102,22 +109,28 @@ async function lookupGoogleBooks(isbn: string): Promise<IsbnLookupResult | null>
   };
 }
 
-export async function lookupBookByIsbn(isbn: string): Promise<IsbnLookupResult | null> {
+export async function lookupBookByIsbn(isbn: string, includeDebug = false): Promise<IsbnLookupResponse> {
   const normalizedIsbn = isbn.replace(/[^0-9Xx]/g, "");
+  const debugCandidates: IsbnLookupDebugCandidate[] = [];
 
   if (!normalizedIsbn) {
-    return null;
+    return { item: null, debugCandidates };
   }
 
   const openLibrary = await lookupOpenLibrary(normalizedIsbn);
   if (openLibrary) {
-    return openLibrary;
+    return { item: openLibrary, debugCandidates };
   }
 
   const googleBooks = await lookupGoogleBooks(normalizedIsbn);
   if (googleBooks) {
-    return googleBooks;
+    return { item: googleBooks, debugCandidates };
   }
 
-  return null;
+  const cdpResult = await lookupBookByIsbnCdp(normalizedIsbn, includeDebug ? debugCandidates : undefined);
+  if (cdpResult) {
+    return { item: cdpResult, debugCandidates };
+  }
+
+  return { item: null, debugCandidates };
 }

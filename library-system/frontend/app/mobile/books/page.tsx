@@ -13,6 +13,7 @@ type BooksResponse = {
     isbn: string | null;
     author: string | null;
     status: string;
+    coverUrl?: string | null;
   }>;
 };
 
@@ -34,7 +35,7 @@ export default function MobileBooksPage() {
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError instanceof Error ? loadError.message : "讀取書籍清單失敗。");
+          setError(loadError instanceof Error ? loadError.message : "書籍清單載入失敗。");
         }
       } finally {
         if (active) {
@@ -69,19 +70,19 @@ export default function MobileBooksPage() {
       <article className="hero-card compact">
         <p className="eyebrow">Books</p>
         <h2>書籍清單</h2>
-        <p>先搜尋書名、館藏條碼、ISBN 或作者，再決定是否編輯、借還或補建資料。</p>
+        <p>可依書名、作者、館藏條碼或 ISBN 搜尋，也能直接看到封面縮圖輔助辨識。</p>
       </article>
 
       <section className="action-grid">
         <Link href="/mobile/books/new" className="action-card">
           <div className="action-badge">新增</div>
           <h3>建立新書籍</h3>
-          <p>支援掃 ISBN、外部書目帶入、選檔或 webcam 拍封面。</p>
+          <p>支援 ISBN 掃碼、封面拍照與館藏條碼建檔。</p>
         </Link>
         <Link href="/mobile" className="action-card">
-          <div className="action-badge">返回</div>
+          <div className="action-badge">首頁</div>
           <h3>回到首頁</h3>
-          <p>切換到借還、會員管理或盤點功能。</p>
+          <p>回借還、盤點與會員管理入口。</p>
         </Link>
       </section>
 
@@ -91,7 +92,7 @@ export default function MobileBooksPage() {
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="輸入書名、館藏條碼、ISBN 或作者"
+            placeholder="輸入書名、作者、館藏條碼或 ISBN"
           />
         </label>
       </section>
@@ -100,19 +101,34 @@ export default function MobileBooksPage() {
         {loading ? <div className="feedback">載入中...</div> : null}
         {error ? <div className="feedback error">{error}</div> : null}
         {!loading && !error && filteredItems.length === 0 ? (
-          <div className="feedback">{keyword ? "查無符合條件的書籍。" : "目前還沒有書籍資料。"}</div>
+          <div className="feedback">
+            {keyword ? "查不到符合條件的書籍。" : "目前還沒有書籍資料。"}
+          </div>
         ) : null}
         {!loading && !error
           ? filteredItems.map((book) => (
-              <article key={book.id} className="book-row">
-                <div>
+              <article key={book.id} className="book-row book-row-with-cover">
+                <div className="book-cover-slot">
+                  {book.coverUrl ? (
+                    <img
+                      src={book.coverUrl}
+                      alt={`${book.title} 封面`}
+                      className="book-cover-thumb"
+                    />
+                  ) : (
+                    <div className="book-cover-placeholder">無封面</div>
+                  )}
+                </div>
+
+                <div className="book-row-main">
                   <h3>{book.title}</h3>
                   <p>館藏條碼：{book.accessionCode}</p>
                   <p>ISBN：{book.isbn ?? "未填寫"}</p>
+                  <p>作者：{book.author ?? "未填寫"}</p>
                 </div>
+
                 <div className="book-row-side">
                   <span className="status-pill">{book.status}</span>
-                  <p>{book.author ?? "未填寫作者"}</p>
                   <Link href={`/mobile/books/${book.id}/edit`} className="inline-link">
                     編輯
                   </Link>

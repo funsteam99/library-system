@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { type ChangeEvent, type FormEvent, useMemo, useRef, useState, useTransition } from "react";
+import {
+  type ChangeEvent,
+  type FormEvent,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
 
 import { BarcodeScanner } from "../../../components/barcode-scanner";
 import { CameraCapture } from "../../../components/camera-capture";
@@ -47,7 +54,10 @@ type CreateBookResponse = {
   };
 };
 
+type ScanMode = "auto" | "isbn" | "accession";
+
 export default function MobileBookCreatePage() {
+  const [scanMode, setScanMode] = useState<ScanMode>("auto");
   const [isbn, setIsbn] = useState("");
   const [accessionCode, setAccessionCode] = useState("");
   const [title, setTitle] = useState("");
@@ -69,16 +79,24 @@ export default function MobileBookCreatePage() {
   const lastLookedUpIsbn = useRef("");
 
   const scanHint = useMemo(() => {
+    if (scanMode === "isbn") {
+      return "目前掃碼會直接覆蓋 ISBN 欄位，適合想重掃 ISBN 的情況。";
+    }
+
+    if (scanMode === "accession") {
+      return "目前掃碼會直接覆蓋館藏條碼欄位，適合連續貼標與建檔。";
+    }
+
     if (isbn && accessionCode) {
-      return "ISBN 與館藏條碼都已輸入，可以直接建檔。";
+      return "自動判斷模式下，ISBN 與館藏條碼都已有值，下一次掃碼會覆蓋館藏條碼。";
     }
 
     if (isbn) {
-      return "已取得 ISBN，請再掃館藏條碼，或直接沿用 ISBN 當館藏碼。";
+      return "自動判斷模式下，下一次掃碼會填入館藏條碼。";
     }
 
-    return "先掃 ISBN 取得書目資料，再掃館藏條碼會最快。";
-  }, [accessionCode, isbn]);
+    return "自動判斷模式下，第一次掃碼會先填 ISBN。";
+  }, [accessionCode, isbn, scanMode]);
 
   async function checkDuplicates(nextIsbn: string, nextAccessionCode: string) {
     const normalizedIsbn = nextIsbn.replace(/[^0-9Xx]/g, "");
@@ -100,18 +118,22 @@ export default function MobileBookCreatePage() {
     }
 
     try {
-      const payload = await apiRequest<DuplicateCheckResponse>(`/api/books/check?${params.toString()}`);
+      const payload = await apiRequest<DuplicateCheckResponse>(
+        `/api/books/check?${params.toString()}`,
+      );
       const messages: string[] = [];
 
       setDuplicateBooks(payload.item.isbnMatches);
       setHasAccessionConflict(Boolean(payload.item.accessionMatch));
 
       if (payload.item.isbnMatches.length > 0) {
-        messages.push(`此 ISBN 已有 ${payload.item.isbnMatches.length} 本館藏紀錄。`);
+        messages.push(`此 ISBN 已有 ${payload.item.isbnMatches.length} 筆館藏紀錄。`);
       }
 
       if (payload.item.accessionMatch) {
-        messages.push(`館藏條碼 ${payload.item.accessionCode} 已被《${payload.item.accessionMatch.title}》使用。`);
+        messages.push(
+          `館藏條碼 ${payload.item.accessionCode} 已存在於《${payload.item.accessionMatch.title}》。`,
+        );
       }
 
       setDuplicateMessage(messages.length > 0 ? messages.join(" ") : null);
@@ -141,7 +163,9 @@ export default function MobileBookCreatePage() {
 
     startLookupTransition(async () => {
       try {
-        const payload = await apiRequest<LookupResponse>(`/api/books/lookup/isbn/${normalized}`);
+        const payload = await apiRequest<LookupResponse>(
+          `/api/books/lookup/isbn/${normalized}`,
+        );
 
         if (payload.item?.title && !title) {
           setTitle(payload.item.title);
@@ -165,32 +189,51 @@ export default function MobileBookCreatePage() {
               ? "Open Library"
               : payload.item.source === "googlebooks"
                 ? "Google Books"
-                : "外部書目";
+                : "站內搜尋";
 
-          setLookupMessage(`已自動帶入書籍資料，來源：${sourceLabel}。`);
+          setLookupMessage(`已從 ${sourceLabel} 帶入部分書籍資料。`);
         } else {
           setLookupMessage("查不到外部書目資料，請直接手動輸入書名與作者。");
         }
       } catch {
         lastLookedUpIsbn.current = "";
-        setLookupMessage("目前無法查詢外部書目，請先手動輸入資料。");
+        setLookupMessage("查詢書目資料失敗，請稍後再試。");
       } finally {
         await checkDuplicates(normalized, accessionCode || normalized);
       }
     });
   }
 
+  function applyScannedValueToIsbn(code: string) {
+    setIsbn(code);
+    setLookupMessage(null);
+    void lookupIsbnMetadata(code);
+  }
+
+  function applyScannedValueToAccession(code: string) {
+    setAccessionCode(code);
+    void checkDuplicates(isbn, code);
+  }
+
   function handleBookCodeDetected(code: string) {
     setError(null);
 
-    if (!isbn) {
-      setIsbn(code);
-      void lookupIsbnMetadata(code);
+    if (scanMode === "isbn") {
+      applyScannedValueToIsbn(code);
       return;
     }
 
-    setAccessionCode(code);
-    void checkDuplicates(isbn, code);
+    if (scanMode === "accession") {
+      applyScannedValueToAccession(code);
+      return;
+    }
+
+    if (!isbn) {
+      applyScannedValueToIsbn(code);
+      return;
+    }
+
+    applyScannedValueToAccession(code);
   }
 
   function handleIsbnBlur() {
@@ -225,7 +268,7 @@ export default function MobileBookCreatePage() {
     setCreatedBookId(null);
 
     if (hasAccessionConflict) {
-      setError("館藏條碼已重複，請先更換條碼再建檔。");
+      setError("館藏條碼已存在，請更換館藏條碼後再送出。");
       return;
     }
 
@@ -236,7 +279,10 @@ export default function MobileBookCreatePage() {
         if (coverFile) {
           const upload = await uploadImage("/api/uploads/book-cover", coverFile);
           coverUrl = upload.url;
-        } else if (coverPreview?.startsWith("/uploads/") || coverPreview?.startsWith("http")) {
+        } else if (
+          coverPreview?.startsWith("/uploads/") ||
+          coverPreview?.startsWith("http")
+        ) {
           coverUrl = coverPreview;
         }
 
@@ -271,19 +317,46 @@ export default function MobileBookCreatePage() {
       <article className="hero-card compact">
         <p className="eyebrow">Book intake</p>
         <h2>書籍建檔</h2>
-        <p>手機可掃 ISBN，桌機也可直接開 webcam 拍封面，再補館藏條碼完成建檔。</p>
+        <p>可先掃 ISBN 帶入資料，再掃館藏條碼；也可切換掃碼模式做實操比較。</p>
       </article>
 
       <section className="action-grid compact">
         <Link href="/mobile/books" className="action-card">
           <div className="action-badge">書籍</div>
           <h3>查看書籍清單</h3>
-          <p>建檔完成後可直接回清單確認資料是否正確。</p>
+          <p>建檔後可直接回清單確認資料與封面。</p>
         </Link>
       </section>
 
+      <section className="feedback">
+        <div>掃碼模式</div>
+        <div className="segmented-control">
+          <button
+            type="button"
+            className={`segmented-button ${scanMode === "auto" ? "active" : ""}`}
+            onClick={() => setScanMode("auto")}
+          >
+            自動判斷
+          </button>
+          <button
+            type="button"
+            className={`segmented-button ${scanMode === "isbn" ? "active" : ""}`}
+            onClick={() => setScanMode("isbn")}
+          >
+            掃 ISBN
+          </button>
+          <button
+            type="button"
+            className={`segmented-button ${scanMode === "accession" ? "active" : ""}`}
+            onClick={() => setScanMode("accession")}
+          >
+            掃館藏條碼
+          </button>
+        </div>
+      </section>
+
       <BarcodeScanner
-        label="掃描 ISBN / 館藏條碼"
+        label="掃 ISBN / 館藏條碼"
         helperText={scanHint}
         onDetected={handleBookCodeDetected}
       />
@@ -303,14 +376,23 @@ export default function MobileBookCreatePage() {
           />
         </label>
 
-        <button
-          type="button"
-          className="ghost-button"
-          onClick={() => void lookupIsbnMetadata(isbn)}
-          disabled={isLookupPending}
-        >
-          {isLookupPending ? "查詢中..." : "用 ISBN 帶入資料"}
-        </button>
+        <div className="inline-actions">
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => void lookupIsbnMetadata(isbn)}
+            disabled={isLookupPending}
+          >
+            {isLookupPending ? "查詢中..." : "用 ISBN 帶入資料"}
+          </button>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setScanMode("isbn")}
+          >
+            下次掃到 ISBN
+          </button>
+        </div>
 
         {lookupMessage ? <div className="feedback">{lookupMessage}</div> : null}
 
@@ -320,21 +402,45 @@ export default function MobileBookCreatePage() {
             value={accessionCode}
             onChange={(event) => setAccessionCode(event.target.value)}
             onBlur={handleAccessionBlur}
-            placeholder="例如 B0002，留空則沿用 ISBN"
+            placeholder="例如 B0002，也可沿用 ISBN"
             autoCapitalize="characters"
           />
         </label>
 
+        <div className="inline-actions">
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => setScanMode("accession")}
+          >
+            下次掃到館藏條碼
+          </button>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => {
+              const nextValue = isbn.trim();
+              setAccessionCode(nextValue);
+              void checkDuplicates(isbn, nextValue);
+            }}
+            disabled={!isbn.trim()}
+          >
+            用 ISBN 當館藏條碼
+          </button>
+        </div>
+
         {duplicateMessage ? (
-          <div className={`feedback ${hasAccessionConflict ? "error" : ""}`}>{duplicateMessage}</div>
+          <div className={`feedback ${hasAccessionConflict ? "error" : ""}`}>
+            {duplicateMessage}
+          </div>
         ) : null}
 
         {duplicateBooks.length > 0 ? (
           <div className="feedback">
-            <div>同 ISBN 館藏：</div>
+            <div>同 ISBN 既有館藏：</div>
             {duplicateBooks.slice(0, 3).map((book) => (
               <div key={book.id}>
-                《{book.title}》 / 館藏碼 {book.accessionCode}
+                《{book.title}》 / 館藏條碼 {book.accessionCode}
               </div>
             ))}
           </div>
@@ -352,7 +458,11 @@ export default function MobileBookCreatePage() {
 
         <label className="field">
           <span>作者</span>
-          <input value={author} onChange={(event) => setAuthor(event.target.value)} placeholder="例如 王小明" />
+          <input
+            value={author}
+            onChange={(event) => setAuthor(event.target.value)}
+            placeholder="例如 王小明"
+          />
         </label>
 
         <label className="field">
@@ -394,12 +504,16 @@ export default function MobileBookCreatePage() {
           <textarea
             value={remark}
             onChange={(event) => setRemark(event.target.value)}
-            placeholder="例如 書況、來源或分類補充"
+            placeholder="例如 書況、來源、特別標記"
             rows={4}
           />
         </label>
 
-        <button type="submit" className="primary-button" disabled={isPending || hasAccessionConflict}>
+        <button
+          type="submit"
+          className="primary-button"
+          disabled={isPending || hasAccessionConflict}
+        >
           {isPending ? "建立中..." : "建立書籍"}
         </button>
       </form>
@@ -409,9 +523,11 @@ export default function MobileBookCreatePage() {
           <div>{message}</div>
           <div className="feedback-link-row">
             <Link href="/mobile/books" className="inline-link">
-              查看全部書籍
+              看全部書籍
             </Link>
-            {createdBookId ? <span className="feedback-meta">ID: {createdBookId}</span> : null}
+            {createdBookId ? (
+              <span className="feedback-meta">ID: {createdBookId}</span>
+            ) : null}
           </div>
         </div>
       ) : null}

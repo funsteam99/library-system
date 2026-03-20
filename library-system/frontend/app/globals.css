@@ -232,6 +232,34 @@ button {
   gap: 10px;
 }
 
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.segmented-button {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: color-mix(in oklab, white 76%, var(--paper) 24%);
+}
+
+.segmented-button.active {
+  border-color: color-mix(in oklab, var(--accent) 45%, white);
+  background: color-mix(in oklab, var(--accent-soft) 54%, white);
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+
 .camera-preview-shell {
   overflow: hidden;
   min-height: 220px;
@@ -437,6 +465,42 @@ button {
   border-radius: 22px;
   border: 1px solid var(--line);
   background: color-mix(in oklab, white 86%, var(--paper-strong) 14%);
+}
+
+.book-row-with-cover {
+  grid-template-columns: 64px 1fr auto;
+  align-items: start;
+}
+
+.book-cover-slot {
+  width: 64px;
+}
+
+.book-cover-thumb,
+.book-cover-placeholder {
+  display: block;
+  width: 64px;
+  aspect-ratio: 3 / 4;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: color-mix(in oklab, white 84%, var(--paper) 16%);
+}
+
+.book-cover-thumb {
+  object-fit: cover;
+}
+
+.book-cover-placeholder {
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
+.book-row-main {
+  min-width: 0;
 }
 
 .book-row h3 {

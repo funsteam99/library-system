@@ -7,7 +7,12 @@ type CameraCaptureProps = {
   onCapture: (file: File, previewUrl: string) => void;
 };
 
-export function CameraCapture({ label = "使用相機拍照", onCapture }: CameraCaptureProps) {
+const DEFAULT_ZOOM = 2;
+
+export function CameraCapture({
+  label = "封面拍照",
+  onCapture,
+}: CameraCaptureProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -33,7 +38,7 @@ export function CameraCapture({ label = "使用相機拍照", onCapture }: Camer
 
   async function startCamera() {
     if (!supported) {
-      setStatus("這台裝置或瀏覽器不支援相機，請改用選檔。");
+      setStatus("這台裝置或瀏覽器不支援相機拍照。");
       return;
     }
 
@@ -58,9 +63,33 @@ export function CameraCapture({ label = "使用相機拍照", onCapture }: Camer
       }
 
       setIsReady(true);
-      setStatus("相機已啟動，可以直接拍封面。");
+
+      try {
+        const [videoTrack] = stream.getVideoTracks();
+        const capabilities = videoTrack?.getCapabilities?.() as MediaTrackCapabilities & {
+          zoom?: { min?: number; max?: number };
+        };
+        const zoomCapability = capabilities?.zoom;
+
+        if (typeof zoomCapability === "object" && zoomCapability) {
+          const nextZoom = Math.min(
+            Math.max(DEFAULT_ZOOM, zoomCapability.min ?? DEFAULT_ZOOM),
+            zoomCapability.max ?? DEFAULT_ZOOM,
+          );
+
+          await videoTrack.applyConstraints({
+            advanced: [{ zoom: nextZoom } as MediaTrackConstraintSet],
+          });
+
+          setStatus(`相機已啟動，已套用 ${nextZoom.toFixed(1)}x 變焦`);
+        } else {
+          setStatus("相機已啟動，裝置不支援變焦控制");
+        }
+      } catch {
+        setStatus("相機已啟動，變焦套用失敗，已使用原始倍率");
+      }
     } catch {
-      setStatus("無法啟動相機，請確認瀏覽器權限或改用選檔。");
+      setStatus("無法開啟相機，請確認瀏覽器權限已允許。");
       stopCamera();
     } finally {
       setIsStarting(false);
@@ -83,7 +112,7 @@ export function CameraCapture({ label = "使用相機拍照", onCapture }: Camer
 
     const context = canvas.getContext("2d");
     if (!context) {
-      setStatus("目前無法處理相機畫面。");
+      setStatus("無法取得拍照畫布。");
       return;
     }
 
@@ -94,14 +123,16 @@ export function CameraCapture({ label = "使用相機拍照", onCapture }: Camer
     });
 
     if (!blob) {
-      setStatus("拍照失敗，請再試一次。");
+      setStatus("照片擷取失敗，請再試一次。");
       return;
     }
 
-    const file = new File([blob], `book-cover-${Date.now()}.jpg`, { type: "image/jpeg" });
+    const file = new File([blob], `camera-capture-${Date.now()}.jpg`, {
+      type: "image/jpeg",
+    });
     const previewUrl = URL.createObjectURL(file);
     onCapture(file, previewUrl);
-    setStatus("已拍下封面照片。");
+    setStatus("照片已套用到表單。");
     stopCamera();
   }
 
@@ -110,18 +141,35 @@ export function CameraCapture({ label = "使用相機拍照", onCapture }: Camer
       <div className="camera-head">
         <div>
           <h3>{label}</h3>
-          <p className="scanner-text">桌機 Chrome 或筆電相機都可以直接拍照後套用成封面。</p>
+          <p className="scanner-text">
+            桌機 Chrome 也可直接啟用 webcam 拍照，系統會先嘗試套用 2x 變焦。
+          </p>
         </div>
       </div>
 
       <div className="camera-actions">
-        <button type="button" className="ghost-button" onClick={() => void startCamera()} disabled={isStarting}>
+        <button
+          type="button"
+          className="ghost-button"
+          onClick={() => void startCamera()}
+          disabled={isStarting}
+        >
           {isStarting ? "啟動中..." : "開啟相機"}
         </button>
-        <button type="button" className="ghost-button" onClick={handleCapture} disabled={!isReady}>
+        <button
+          type="button"
+          className="ghost-button"
+          onClick={handleCapture}
+          disabled={!isReady}
+        >
           拍照套用
         </button>
-        <button type="button" className="ghost-button" onClick={stopCamera} disabled={!isReady}>
+        <button
+          type="button"
+          className="ghost-button"
+          onClick={stopCamera}
+          disabled={!isReady}
+        >
           關閉相機
         </button>
       </div>
