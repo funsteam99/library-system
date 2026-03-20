@@ -33,12 +33,16 @@ booksRouter.get(
   asyncHandler(async (req, res) => {
     const isbn = requireParam(req.params.isbn, "isbn");
     const includeDebug = req.query.debug === "1";
-    const { item, debugCandidates } = await lookupBookByIsbn(isbn, includeDebug);
+    const { item, debugCandidates, attemptedSources, matchedSource, foundFields } =
+      await lookupBookByIsbn(isbn, includeDebug);
 
     res.json({
       item,
       found: Boolean(item),
       message: item ? null : "No metadata found for this ISBN",
+      attemptedSources,
+      matchedSource,
+      foundFields,
       debugCandidates: includeDebug ? debugCandidates : undefined,
     });
   }),

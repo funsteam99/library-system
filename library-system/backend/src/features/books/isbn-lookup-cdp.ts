@@ -5,13 +5,22 @@ import { spawn, type ChildProcess } from "node:child_process";
 
 import CDP from "chrome-remote-interface";
 
+export type LookupSourceId =
+  | "openlibrary"
+  | "googlebooks"
+  | "taaze"
+  | "books_tw"
+  | "cinii"
+  | "amazon_jp"
+  | "amazon";
+
 type IsbnLookupResult = {
   title: string | null;
   author: string | null;
   publisher: string | null;
   publishYear: number | null;
   coverUrl: string | null;
-  source: "openlibrary" | "googlebooks" | "cdp-search" | null;
+  source: LookupSourceId | null;
 };
 
 type SearchCandidate = {
@@ -32,6 +41,8 @@ export type IsbnLookupDebugCandidate = {
 };
 
 type SearchSource = {
+  id: LookupSourceId;
+  label: string;
   domain: string;
   searchUrl: (isbn: string) => string;
   productUrlPatterns: RegExp[];
@@ -52,28 +63,38 @@ const browserCandidates = [
 
 const searchSources: SearchSource[] = [
   {
+    id: "taaze",
+    label: "讀冊",
     domain: "www.taaze.tw",
     searchUrl: (isbn) =>
       `https://www.taaze.tw/rwd_searchResult.html?keyword%5B%5D=${encodeURIComponent(isbn)}&keyType%5B%5D=0`,
     productUrlPatterns: [/\/products\/[^/?#]+/i],
   },
   {
+    id: "books_tw",
+    label: "博客來",
     domain: "www.books.com.tw",
     searchUrl: (isbn) => `https://search.books.com.tw/search/query/key/${encodeURIComponent(isbn)}/cat/books`,
     productUrlPatterns: [/\/products\/[^/?#]+/i],
   },
   {
+    id: "cinii",
+    label: "CiNii Books",
     domain: "ci.nii.ac.jp",
     searchUrl: (isbn) => `https://ci.nii.ac.jp/books/search?isbn=${encodeURIComponent(isbn)}`,
     productUrlPatterns: [/\/ncid\/[A-Z0-9]+/i],
   },
   {
+    id: "amazon_jp",
+    label: "Amazon.co.jp",
     domain: "www.amazon.co.jp",
     searchUrl: (isbn) =>
       `https://www.amazon.co.jp/s?k=${encodeURIComponent(isbn)}&i=stripbooks`,
     productUrlPatterns: [/\/dp\/[A-Z0-9]{10}/i, /\/gp\/product\/[A-Z0-9]{10}/i],
   },
   {
+    id: "amazon",
+    label: "Amazon",
     domain: "www.amazon.com",
     searchUrl: (isbn) =>
       `https://www.amazon.com/s?k=${encodeURIComponent(isbn)}&i=stripbooks-intl-ship`,
@@ -367,7 +388,7 @@ async function collectSearchCandidates(
 async function extractMetadata(
   Runtime: any,
   isbn: string,
-  expectedDomain: string,
+  source: SearchSource,
   candidate: SearchCandidate,
 ): Promise<IsbnLookupResult | null> {
   const evaluation = await Runtime.evaluate({
@@ -502,7 +523,7 @@ async function extractMetadata(
   const bodyText = typeof value.bodyText === "string" ? value.bodyText : "";
   const hostname = typeof value.hostname === "string" ? value.hostname : "";
 
-  if (!title || !bodyText.includes(isbn) || hostname !== expectedDomain) {
+  if (!title || !bodyText.includes(isbn) || hostname !== source.domain) {
     return null;
   }
 
@@ -518,7 +539,7 @@ async function extractMetadata(
     publisher: parsedPublisher || candidate.publisher || null,
     publishYear: normalizeYear(value.publishYear) ?? candidate.publishYear ?? null,
     coverUrl: normalizedCoverUrl || candidate.coverUrl || null,
-    source: "cdp-search",
+    source: source.id,
   };
 }
 
@@ -573,7 +594,7 @@ export async function lookupBookByIsbnCdp(
 
       for (const candidate of accepted) {
         await navigateAndWait(Page, Runtime, candidate.href);
-        const metadata = await extractMetadata(Runtime, isbn, source.domain, candidate);
+        const metadata = await extractMetadata(Runtime, isbn, source, candidate);
 
         if (metadata?.title) {
           await client.close();

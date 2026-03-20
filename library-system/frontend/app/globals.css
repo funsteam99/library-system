@@ -400,6 +400,13 @@ button {
   background: color-mix(in oklab, white 72%, var(--paper) 28%);
 }
 
+.zoom-button-active {
+  border-color: color-mix(in oklab, var(--accent) 45%, white);
+  background: color-mix(in oklab, var(--accent-soft) 54%, white);
+  color: var(--accent-deep);
+  font-weight: 700;
+}
+
 .primary-button:disabled {
   opacity: 0.6;
 }
