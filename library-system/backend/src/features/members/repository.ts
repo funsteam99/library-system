@@ -14,6 +14,25 @@ export type MemberRow = {
   updated_at: string;
 };
 
+export type MemberLoanRow = {
+  id: number;
+  book_id: number;
+  member_id: number;
+  loan_date: string;
+  due_date: string;
+  returned_at: string | null;
+  status: string;
+  loan_by_user_id: number;
+  return_by_user_id: number | null;
+  remark: string | null;
+  created_at: string;
+  updated_at: string;
+  book_title: string;
+  book_accession_code: string;
+  member_name: string;
+  member_code: string;
+};
+
 type CreateMemberInput = {
   memberCode: string;
   name: string;
@@ -57,6 +76,26 @@ export async function getMemberByCode(code: string) {
   );
 
   return result.rows[0] ?? null;
+}
+
+export async function listActiveLoansByMemberId(memberId: number) {
+  const result = await query<MemberLoanRow>(
+    `SELECT
+       l.*,
+       b.title AS book_title,
+       b.accession_code AS book_accession_code,
+       m.name AS member_name,
+       m.member_code
+     FROM loans l
+     INNER JOIN books b ON b.id = l.book_id
+     INNER JOIN members m ON m.id = l.member_id
+     WHERE l.member_id = $1
+       AND l.returned_at IS NULL
+     ORDER BY l.due_date ASC, l.id DESC`,
+    [memberId],
+  );
+
+  return result.rows;
 }
 
 export async function createMember(input: CreateMemberInput) {

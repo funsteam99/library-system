@@ -537,11 +537,31 @@ button {
   font-weight: 700;
 }
 
+.status-pill-loaned {
+  background: color-mix(in oklab, oklch(0.85 0.08 85) 60%, white);
+  color: oklch(0.4 0.09 70);
+}
+
+.status-pill-returned {
+  background: color-mix(in oklab, oklch(0.86 0.1 145) 58%, white);
+  color: oklch(0.42 0.11 145);
+}
+
+.status-pill-overdue {
+  background: color-mix(in oklab, oklch(0.83 0.13 30) 62%, white);
+  color: oklch(0.45 0.16 28);
+}
+
+.status-pill-overdue-returned {
+  background: color-mix(in oklab, oklch(0.84 0.07 20) 58%, white);
+  color: oklch(0.44 0.1 20);
+}
+
 .bottom-nav {
   position: sticky;
   bottom: 12px;
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: 10px;
   padding: 10px;
   border-radius: 24px;
@@ -573,7 +593,7 @@ button {
   }
 
   .bottom-nav {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .bottom-nav-link {

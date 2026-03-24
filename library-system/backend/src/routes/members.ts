@@ -6,10 +6,12 @@ import {
   createMember,
   getMemberByCode,
   getMemberById,
+  listActiveLoansByMemberId,
   listMembers,
   updateMember,
 } from "../features/members/repository.js";
 import { createMemberSchema, updateMemberSchema } from "../features/members/schemas.js";
+import { mapLoan } from "../features/loans/mapper.js";
 import { asyncHandler } from "../lib/async-handler.js";
 import { HttpError } from "../lib/errors.js";
 import { requireParam } from "../lib/params.js";
@@ -36,6 +38,21 @@ membersRouter.get(
     }
 
     res.json({ item: mapMember(row) });
+  }),
+);
+
+membersRouter.get(
+  "/:id/loans",
+  asyncHandler(async (req, res) => {
+    const id = parseId(requireParam(req.params.id, "id"));
+    const member = await getMemberById(id);
+
+    if (!member) {
+      throw new HttpError(404, "Member not found");
+    }
+
+    const rows = await listActiveLoansByMemberId(id);
+    res.json({ items: rows.map(mapLoan) });
   }),
 );
 

@@ -9,6 +9,8 @@ import { uploadsRoot } from "./config/paths.js";
 import { env } from "./config/env.js";
 import { HttpError } from "./lib/errors.js";
 import { booksRouter } from "./routes/books.js";
+import { importsRouter } from "./routes/imports.js";
+import { exportsRouter } from "./routes/exports.js";
 import { healthRouter } from "./routes/health.js";
 import { inventoryRouter } from "./routes/inventory.js";
 import { loansRouter } from "./routes/loans.js";
@@ -32,6 +34,8 @@ export function createApp() {
 
   app.use("/uploads", express.static(path.resolve(uploadsRoot)));
   app.use("/api/health", healthRouter);
+  app.use("/api/imports", importsRouter);
+  app.use("/api/exports", exportsRouter);
   app.use("/api/uploads", uploadsRouter);
   app.use("/api/books", booksRouter);
   app.use("/api/members", membersRouter);
