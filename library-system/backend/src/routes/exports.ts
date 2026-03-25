@@ -2,9 +2,17 @@ import { Router } from "express";
 import * as XLSX from "xlsx";
 
 import { listBooks } from "../features/books/repository.js";
+import {
+  getInventorySessionById,
+  listInventoryItemsBySession,
+  listMissingBooksForSession,
+} from "../features/inventory/repository.js";
 import { listLoans } from "../features/loans/repository.js";
 import { listMembers } from "../features/members/repository.js";
 import { asyncHandler } from "../lib/async-handler.js";
+import { HttpError } from "../lib/errors.js";
+import { requireParam } from "../lib/params.js";
+import { parseId } from "../lib/parse-int.js";
 
 export const exportsRouter = Router();
 
@@ -104,5 +112,57 @@ exportsRouter.get(
       })),
       "Loans",
     );
+  }),
+);
+
+exportsRouter.get(
+  "/inventory/:id.xlsx",
+  asyncHandler(async (req, res) => {
+    const id = parseId(requireParam(req.params.id, "id"));
+    const session = await getInventorySessionById(id);
+
+    if (!session) {
+      throw new HttpError(404, "Inventory session not found");
+    }
+
+    const [items, missingBooks] = await Promise.all([
+      listInventoryItemsBySession(id),
+      listMissingBooksForSession(id),
+    ]);
+
+    const workbook = XLSX.utils.book_new();
+    const scannedSheet = XLSX.utils.json_to_sheet(
+      items.map((row) => ({
+        ID: row.id,
+        書名: row.title,
+        館藏條碼: row.accession_code,
+        ISBN: row.isbn,
+        盤點結果: row.result,
+        掃描時間: row.scanned_at,
+        備註: row.remark,
+      })),
+    );
+    const missingSheet = XLSX.utils.json_to_sheet(
+      missingBooks.map((row) => ({
+        ID: row.id,
+        書名: row.title,
+        館藏條碼: row.accession_code,
+        ISBN: row.isbn,
+        狀態: "未掃到",
+      })),
+    );
+
+    XLSX.utils.book_append_sheet(workbook, scannedSheet, "ScannedItems");
+    XLSX.utils.book_append_sheet(workbook, missingSheet, "MissingBooks");
+
+    const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+    const filename = `inventory-session-${id}.xlsx`;
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="${filename}"; filename*=UTF-8''${encodeURIComponent(filename)}`,
+    );
+    res.type("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.send(buffer);
   }),
 );

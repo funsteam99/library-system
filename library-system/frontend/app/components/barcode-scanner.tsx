@@ -20,10 +20,48 @@ type BarcodeScannerProps = {
   helperText?: string;
   onDetected: (code: string) => void;
   preferredZoom?: number;
+  closeSignal?: number;
 };
+
+const SOUND_STORAGE_KEY = "library-scanner-sound-enabled";
 
 function isIosUserAgent(userAgent: string) {
   return /iPhone|iPad|iPod/i.test(userAgent);
+}
+
+function playScanBeep() {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const AudioContextCtor =
+    window.AudioContext ||
+    // @ts-expect-error Safari legacy fallback
+    window.webkitAudioContext;
+
+  if (!AudioContextCtor) {
+    return;
+  }
+
+  const context = new AudioContextCtor();
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+
+  oscillator.type = "sine";
+  oscillator.frequency.setValueAtTime(880, context.currentTime);
+  oscillator.frequency.exponentialRampToValueAtTime(1320, context.currentTime + 0.08);
+  gain.gain.setValueAtTime(0.0001, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.12, context.currentTime + 0.01);
+  gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.14);
+
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + 0.14);
+
+  setTimeout(() => {
+    void context.close().catch(() => undefined);
+  }, 220);
 }
 
 export function BarcodeScanner({
@@ -31,6 +69,7 @@ export function BarcodeScanner({
   helperText,
   onDetected,
   preferredZoom = 2,
+  closeSignal,
 }: BarcodeScannerProps) {
   const regionId = useId().replace(/:/g, "");
   const scannerRef = useRef<BarcodeScannerHandle | null>(null);
@@ -42,6 +81,7 @@ export function BarcodeScanner({
   const [selectedZoom, setSelectedZoom] = useState(preferredZoom);
   const [zoomRange, setZoomRange] = useState<{ min: number; max: number } | null>(null);
   const [hardwareZoomActive, setHardwareZoomActive] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(false);
 
   useEffect(() => {
     setIsMounted(true);
@@ -52,6 +92,12 @@ export function BarcodeScanner({
 
     const secure = window.isSecureContext;
     const ios = isIosUserAgent(window.navigator.userAgent);
+
+    try {
+      setSoundEnabled(window.localStorage.getItem(SOUND_STORAGE_KEY) === "true");
+    } catch {
+      // ignore localStorage issues
+    }
 
     if (!secure) {
       setCameraSupported(false);
@@ -71,6 +117,14 @@ export function BarcodeScanner({
   useEffect(() => {
     setSelectedZoom(preferredZoom);
   }, [preferredZoom]);
+
+  useEffect(() => {
+    if (closeSignal === undefined) {
+      return;
+    }
+
+    setIsOpen(false);
+  }, [closeSignal]);
 
   async function applyZoom(nextZoom: number) {
     setSelectedZoom(nextZoom);
@@ -109,12 +163,7 @@ export function BarcodeScanner({
       return;
     }
 
-    if (hardwareZoomActive) {
-      video.style.transform = "scale(1)";
-    } else {
-      video.style.transform = `scale(${Math.max(selectedZoom, 1)})`;
-    }
-
+    video.style.transform = hardwareZoomActive ? "scale(1)" : `scale(${Math.max(selectedZoom, 1)})`;
     video.style.transformOrigin = "center center";
   }, [hardwareZoomActive, isMounted, isOpen, regionId, selectedZoom]);
 
@@ -125,6 +174,19 @@ export function BarcodeScanner({
 
     let mounted = true;
     let scannerInstance: BarcodeScannerHandle | null = null;
+    let scannerStarted = false;
+
+    function safeClearScanner(instance: BarcodeScannerHandle | null) {
+      if (!instance) {
+        return;
+      }
+
+      try {
+        instance.clear();
+      } catch {
+        // ignore cleanup errors from partially initialized scanners
+      }
+    }
 
     async function startScanner() {
       try {
@@ -162,6 +224,10 @@ export function BarcodeScanner({
               return;
             }
 
+            if (soundEnabled) {
+              playScanBeep();
+            }
+
             onDetected(decodedText);
             setStatus(`已掃描：${decodedText}`);
             setIsOpen(false);
@@ -172,6 +238,7 @@ export function BarcodeScanner({
             }
           },
         );
+        scannerStarted = true;
 
         try {
           const capabilities = scanner.getRunningTrackCapabilities() as MediaTrackCapabilities & {
@@ -186,13 +253,12 @@ export function BarcodeScanner({
             if (mounted) {
               setZoomRange(nextRange);
             }
-            const appliedZoom = Math.min(
-              Math.max(selectedZoom, nextRange.min),
-              nextRange.max,
-            );
+
+            const appliedZoom = Math.min(Math.max(selectedZoom, nextRange.min), nextRange.max);
             await scanner.applyVideoConstraints({
               advanced: [{ zoom: appliedZoom } as MediaTrackConstraintSet],
             });
+
             if (mounted) {
               setHardwareZoomActive(true);
               setStatus(`相機已啟動，已套用 ${appliedZoom.toFixed(1)}x 變焦`);
@@ -223,12 +289,23 @@ export function BarcodeScanner({
       setHardwareZoomActive(false);
 
       if (scannerInstance) {
-        void scannerInstance.stop().catch(() => undefined).finally(() => {
-          scannerInstance?.clear();
-        });
+        if (scannerStarted) {
+          try {
+            void scannerInstance
+              .stop()
+              .catch(() => undefined)
+              .finally(() => {
+                safeClearScanner(scannerInstance);
+              });
+          } catch {
+            safeClearScanner(scannerInstance);
+          }
+        } else {
+          safeClearScanner(scannerInstance);
+        }
       }
     };
-  }, [cameraSupported, isMounted, isOpen, onDetected, regionId, selectedZoom]);
+  }, [cameraSupported, isMounted, isOpen, onDetected, regionId, selectedZoom, soundEnabled]);
 
   const effectiveHelperText = useMemo(() => {
     if (secureHint) {
@@ -237,6 +314,19 @@ export function BarcodeScanner({
 
     return helperText ?? "開啟相機後可直接掃描書籍條碼或 ISBN。";
   }, [helperText, secureHint]);
+
+  function toggleSound() {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(SOUND_STORAGE_KEY, String(next));
+      } catch {
+        // ignore localStorage issues
+      }
+    }
+  }
 
   return (
     <section className="scanner-card">
@@ -269,6 +359,14 @@ export function BarcodeScanner({
             {zoom}x
           </button>
         ))}
+
+        <button
+          type="button"
+          className={`ghost-button ${soundEnabled ? "zoom-button-active" : ""}`}
+          onClick={toggleSound}
+        >
+          {soundEnabled ? "提示音開" : "提示音關"}
+        </button>
       </div>
 
       {isMounted && isOpen && cameraSupported ? (
@@ -278,6 +376,7 @@ export function BarcodeScanner({
       <div className="scanner-status">
         {status}
         {zoomRange ? ` 可用倍率 ${zoomRange.min.toFixed(1)}x - ${zoomRange.max.toFixed(1)}x` : ""}
+        {soundEnabled ? " / 掃描成功會播放提示音" : ""}
       </div>
     </section>
   );

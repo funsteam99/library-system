@@ -83,8 +83,18 @@ const scanModeOptions: Array<{ value: ScanMode; label: string; helper: string }>
   },
 ];
 
+function normalizeIsbnValue(value: string) {
+  return value.replace(/[^0-9Xx]/g, "");
+}
+
+function isLikelyCompleteIsbn(value: string) {
+  const normalized = normalizeIsbnValue(value);
+  return normalized.length === 10 || normalized.length === 13;
+}
+
 export default function MobileBookCreatePage() {
   const [scanMode, setScanMode] = useState<ScanMode>("auto");
+  const [scannerCloseSignal, setScannerCloseSignal] = useState(0);
   const [isbn, setIsbn] = useState("");
   const [accessionCode, setAccessionCode] = useState("");
   const [title, setTitle] = useState("");
@@ -333,10 +343,19 @@ export default function MobileBookCreatePage() {
     void checkDuplicates(isbn, nextAccessionCode);
   }
 
+  function closeScannerForManualInput() {
+    setScannerCloseSignal((value) => value + 1);
+  }
+
   function handleIsbnBlur() {
     const normalized = isbn.trim();
 
     if (!normalized) {
+      return;
+    }
+
+    if (!isLikelyCompleteIsbn(normalized)) {
+      setLookupMessage("ISBN 尚未輸入完整，先暫停查詢；輸入完整後再自動帶入資料。");
       return;
     }
 
@@ -433,6 +452,7 @@ export default function MobileBookCreatePage() {
         label="掃書籍條碼"
         helperText="開啟掃描後，會依照目前模式強制更新欄位；若是 ISBN 也會重新查詢書目。"
         onDetected={handleBookCodeDetected}
+        closeSignal={scannerCloseSignal}
       />
 
       <form className="mobile-form" onSubmit={handleSubmit}>
@@ -441,9 +461,12 @@ export default function MobileBookCreatePage() {
           <input
             value={isbn}
             onChange={(event) => {
+              closeScannerForManualInput();
               setIsbn(event.target.value);
+              setLookupMessage(null);
               setError(null);
             }}
+            onFocus={closeScannerForManualInput}
             onBlur={handleIsbnBlur}
             placeholder="例如 9789866535581"
             inputMode="numeric"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type CameraCaptureProps = {
   label?: string;
@@ -22,12 +22,11 @@ export function CameraCapture({
   const [selectedZoom, setSelectedZoom] = useState(DEFAULT_ZOOM);
   const [zoomRange, setZoomRange] = useState<{ min: number; max: number } | null>(null);
   const [hardwareZoomActive, setHardwareZoomActive] = useState(false);
-
-  const supported = useMemo(() => {
-    return typeof window !== "undefined" && Boolean(navigator.mediaDevices?.getUserMedia);
-  }, []);
+  const [supported, setSupported] = useState(false);
 
   useEffect(() => {
+    setSupported(Boolean(navigator.mediaDevices?.getUserMedia));
+
     return () => {
       stopCamera();
     };

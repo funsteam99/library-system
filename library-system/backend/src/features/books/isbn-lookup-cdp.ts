@@ -10,6 +10,8 @@ export type LookupSourceId =
   | "googlebooks"
   | "taaze"
   | "books_tw"
+  | "tenlong"
+  | "sanmin"
   | "cinii"
   | "amazon_jp"
   | "amazon";
@@ -76,6 +78,21 @@ const searchSources: SearchSource[] = [
     domain: "www.books.com.tw",
     searchUrl: (isbn) => `https://search.books.com.tw/search/query/key/${encodeURIComponent(isbn)}/cat/books`,
     productUrlPatterns: [/\/products\/[^/?#]+/i],
+  },
+  {
+    id: "tenlong",
+    label: "天瓏書店",
+    domain: "www.tenlong.com.tw",
+    searchUrl: (isbn) => `https://www.tenlong.com.tw/search?keyword=${encodeURIComponent(isbn)}`,
+    productUrlPatterns: [/\/products\/[^/?#]+/i],
+  },
+  {
+    id: "sanmin",
+    label: "三民書局",
+    domain: "www.sanmin.com.tw",
+    searchUrl: (isbn) =>
+      `https://www.sanmin.com.tw/search/index/?ct=ISBN&ls=SD&qu=${encodeURIComponent(isbn)}`,
+    productUrlPatterns: [/\/product\/index\/[^/?#]+/i],
   },
   {
     id: "cinii",
