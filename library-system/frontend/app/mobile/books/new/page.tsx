@@ -22,20 +22,30 @@ type LookupSource = {
   label: string;
 };
 
+type LookupItem = {
+  title: string | null;
+  author: string | null;
+  publisher: string | null;
+  publishYear: number | null;
+  coverUrl: string | null;
+  source: string | null;
+};
+
+type LookupCandidate = {
+  item: LookupItem;
+  matchedSource: LookupSource | null;
+  foundFields: string[];
+  completenessScore: number;
+};
+
 type LookupResponse = {
-  item: {
-    title: string | null;
-    author: string | null;
-    publisher: string | null;
-    publishYear: number | null;
-    coverUrl: string | null;
-    source: string | null;
-  } | null;
+  item: LookupItem | null;
   found: boolean;
   message: string | null;
   attemptedSources: LookupSource[];
   matchedSource: LookupSource | null;
   foundFields: string[];
+  candidates: LookupCandidate[];
 };
 
 type BookSummary = {
@@ -69,17 +79,17 @@ const scanModeOptions: Array<{ value: ScanMode; label: string; helper: string }>
   {
     value: "auto",
     label: "自動判斷",
-    helper: "先填 ISBN，再把下一次掃碼帶到館藏條碼。",
+    helper: "第一次掃描先帶入 ISBN，第二次掃描再帶入館藏條碼。",
   },
   {
     value: "isbn",
     label: "掃 ISBN",
-    helper: "每次掃碼都覆蓋 ISBN，並強制重新查詢書目。",
+    helper: "每次掃描都會覆蓋 ISBN，並重新查詢書籍資料。",
   },
   {
     value: "accession",
     label: "掃館藏條碼",
-    helper: "每次掃碼都覆蓋館藏條碼，不查外部書目。",
+    helper: "每次掃描都會覆蓋館藏條碼。",
   },
 ];
 
@@ -114,6 +124,8 @@ export default function MobileBookCreatePage() {
     matchedSource: null,
     foundFields: [],
   });
+  const [lookupCandidates, setLookupCandidates] = useState<LookupCandidate[]>([]);
+  const [activeCandidateIndex, setActiveCandidateIndex] = useState(0);
   const [duplicateMessage, setDuplicateMessage] = useState<string | null>(null);
   const [duplicateBooks, setDuplicateBooks] = useState<BookSummary[]>([]);
   const [hasAccessionConflict, setHasAccessionConflict] = useState(false);
@@ -124,20 +136,22 @@ export default function MobileBookCreatePage() {
 
   const lastLookedUpIsbn = useRef("");
 
-  const canUseIsbnAsAccession = useMemo(() => {
-    return isbn.trim().length > 0;
-  }, [isbn]);
+  const canUseIsbnAsAccession = useMemo(() => isbn.trim().length > 0, [isbn]);
+  const activeCandidate = lookupCandidates[activeCandidateIndex] ?? null;
 
-  function resetLookupState() {
+  function closeScannerForManualInput() {
+    setScannerCloseSignal((value) => value + 1);
+  }
+
+  function clearLookupState() {
     setLookupMessage(null);
     setLookupTrace({
       attemptedSources: [],
       matchedSource: null,
       foundFields: [],
     });
-    setDuplicateMessage(null);
-    setDuplicateBooks([]);
-    setHasAccessionConflict(false);
+    setLookupCandidates([]);
+    setActiveCandidateIndex(0);
     lastLookedUpIsbn.current = "";
   }
 
@@ -151,8 +165,59 @@ export default function MobileBookCreatePage() {
     setRemark("");
     setCoverPreview(null);
     setCoverFile(null);
-    resetLookupState();
+    clearLookupState();
+    setDuplicateMessage(null);
+    setDuplicateBooks([]);
+    setHasAccessionConflict(false);
     setError(null);
+  }
+
+  function applyLookupCandidate(candidate: LookupCandidate) {
+    if (candidate.item.title) {
+      setTitle(candidate.item.title);
+    }
+    if (candidate.item.author) {
+      setAuthor(candidate.item.author);
+    }
+    if (candidate.item.publisher) {
+      setPublisher(candidate.item.publisher);
+    }
+    if (typeof candidate.item.publishYear === "number") {
+      setPublishYear(String(candidate.item.publishYear));
+    }
+    if (candidate.item.coverUrl) {
+      setCoverPreview(candidate.item.coverUrl);
+      setCoverFile(null);
+    }
+
+    setLookupTrace((current) => ({
+      attemptedSources: current.attemptedSources,
+      matchedSource: candidate.matchedSource,
+      foundFields: candidate.foundFields,
+    }));
+  }
+
+  function applyCandidateAtIndex(nextIndex: number) {
+    const candidate = lookupCandidates[nextIndex];
+
+    if (!candidate) {
+      return;
+    }
+
+    setActiveCandidateIndex(nextIndex);
+    applyLookupCandidate(candidate);
+    setLookupMessage(
+      `已套用第 ${nextIndex + 1} / ${lookupCandidates.length} 筆資料，來源：${candidate.matchedSource?.label ?? "未知來源"}`,
+    );
+  }
+
+  function showNextLookupCandidate() {
+    if (lookupCandidates.length <= 1) {
+      return;
+    }
+
+    const nextIndex = (activeCandidateIndex + 1) % lookupCandidates.length;
+    applyCandidateAtIndex(nextIndex);
   }
 
   function handleCoverSelected(file: File, previewUrl: string) {
@@ -210,7 +275,7 @@ export default function MobileBookCreatePage() {
 
       setDuplicateMessage(messages.length > 0 ? messages.join(" ") : null);
     } catch {
-      setDuplicateMessage("重複館藏檢查暫時失敗，仍可先手動確認。");
+      setDuplicateMessage("重複資料檢查失敗，請稍後再試。");
       setDuplicateBooks([]);
       setHasAccessionConflict(false);
     }
@@ -220,7 +285,7 @@ export default function MobileBookCreatePage() {
     const normalized = nextIsbn.trim();
 
     if (!normalized) {
-      resetLookupState();
+      clearLookupState();
       return;
     }
 
@@ -229,12 +294,14 @@ export default function MobileBookCreatePage() {
     }
 
     lastLookedUpIsbn.current = normalized;
-    setLookupMessage("正在查詢外部書目資料...");
+    setLookupMessage("正在比對多個來源的書籍資料...");
     setLookupTrace({
       attemptedSources: [],
       matchedSource: null,
       foundFields: [],
     });
+    setLookupCandidates([]);
+    setActiveCandidateIndex(0);
     setError(null);
 
     try {
@@ -248,46 +315,33 @@ export default function MobileBookCreatePage() {
         foundFields: payload.foundFields ?? [],
       });
 
-      if (!payload.item) {
-        setLookupMessage("查不到可用書目資料，請直接手動輸入。");
+      const candidates = payload.candidates ?? [];
+      setLookupCandidates(candidates);
+      setActiveCandidateIndex(0);
+
+      if (candidates.length === 0 || !payload.item) {
+        setLookupMessage("查不到可用的書目資料，請直接手動輸入。");
         return;
       }
 
-      if (payload.item.title) {
-        setTitle(payload.item.title);
-      }
-      if (payload.item.author) {
-        setAuthor(payload.item.author);
-      }
-      if (payload.item.publisher) {
-        setPublisher(payload.item.publisher);
-      }
-      if (typeof payload.item.publishYear === "number") {
-        setPublishYear(String(payload.item.publishYear));
-      }
-      if (payload.item.coverUrl) {
-        setCoverPreview(payload.item.coverUrl);
-        setCoverFile(null);
-      }
+      applyLookupCandidate(candidates[0]);
 
       const missingRequiredFields = REQUIRED_METADATA_FIELDS.filter(
-        (field) => !payload.foundFields.includes(field),
+        (field) => !candidates[0].foundFields.includes(field),
       );
 
       if (missingRequiredFields.length === 0) {
         setLookupMessage(
-          `已命中 ${payload.matchedSource?.label ?? "外部來源"}，並自動帶入完整書目資料。`,
+          `找到 ${candidates.length} 筆候選資料，已先帶入最完整的一筆。可按「下一筆」切換。`,
         );
       } else {
         setLookupMessage(
-          `已先帶入找到的欄位；仍缺少 ${missingRequiredFields.join("、")}，請手動補齊。`,
+          `找到 ${candidates.length} 筆候選資料，已先帶入目前最完整的一筆；仍缺少 ${missingRequiredFields.join("、")}。`,
         );
       }
     } catch (lookupError) {
       setLookupMessage(
-        lookupError instanceof Error
-          ? lookupError.message
-          : "查詢外部書目資料時發生錯誤。",
+        lookupError instanceof Error ? lookupError.message : "查詢書籍資料失敗，請稍後再試。",
       );
     }
   }
@@ -299,7 +353,6 @@ export default function MobileBookCreatePage() {
       return;
     }
 
-    // 掃描器在建完上一本後應直接進入下一本，不沿用舊欄位。
     if (createdBookId || message) {
       resetForNextBook();
       setCreatedBookId(null);
@@ -319,9 +372,7 @@ export default function MobileBookCreatePage() {
       return;
     }
 
-    const shouldUseIsbn = !isbn.trim();
-
-    if (shouldUseIsbn) {
+    if (!isbn.trim()) {
       setIsbn(nextCode);
       void checkDuplicates(nextCode, accessionCode);
       void lookupIsbnMetadata(nextCode, true);
@@ -341,10 +392,6 @@ export default function MobileBookCreatePage() {
 
     setAccessionCode(nextAccessionCode);
     void checkDuplicates(isbn, nextAccessionCode);
-  }
-
-  function closeScannerForManualInput() {
-    setScannerCloseSignal((value) => value + 1);
   }
 
   function handleIsbnBlur() {
@@ -374,7 +421,7 @@ export default function MobileBookCreatePage() {
     setError(null);
 
     if (hasAccessionConflict) {
-      setError("館藏條碼已存在，請更換後再建立書籍。");
+      setError("館藏條碼已存在，請改用其他條碼。");
       return;
     }
 
@@ -403,11 +450,11 @@ export default function MobileBookCreatePage() {
         });
 
         setCreatedBookId(payload.item.id);
-        setMessage(`已建立書籍《${payload.item.title}》，館藏條碼 ${payload.item.accessionCode}。`);
+        setMessage(`已建立《${payload.item.title}》，館藏條碼 ${payload.item.accessionCode}。`);
         resetForNextBook();
       } catch (submitError) {
         setError(
-          submitError instanceof Error ? submitError.message : "建立書籍時發生錯誤。",
+          submitError instanceof Error ? submitError.message : "建立書籍失敗，請稍後再試。",
         );
       }
     });
@@ -418,14 +465,14 @@ export default function MobileBookCreatePage() {
       <article className="hero-card compact">
         <p className="eyebrow">Book intake</p>
         <h2>書籍建檔</h2>
-        <p>先掃 ISBN 帶入可找到的書目資料，再補館藏條碼、封面與備註；建立後可直接掃下一本。</p>
+        <p>可先掃 ISBN 帶入多個來源的候選資料，再補館藏條碼、封面與備註。</p>
       </article>
 
       <section className="action-grid compact">
         <Link href="/mobile/books" className="action-card">
           <div className="action-badge">書籍</div>
           <h3>查看書籍清單</h3>
-          <p>確認剛建立的資料、封面與狀態，或再進一步編輯。</p>
+          <p>建檔完成後可回清單確認資料與封面是否正確。</p>
         </Link>
       </section>
 
@@ -449,8 +496,8 @@ export default function MobileBookCreatePage() {
       </section>
 
       <BarcodeScanner
-        label="掃書籍條碼"
-        helperText="開啟掃描後，會依照目前模式強制更新欄位；若是 ISBN 也會重新查詢書目。"
+        label="開啟掃描"
+        helperText="可掃 ISBN 或館藏條碼。若要手動輸入 ISBN，點入欄位後會自動關閉掃描器。"
         onDetected={handleBookCodeDetected}
         closeSignal={scannerCloseSignal}
       />
@@ -468,7 +515,7 @@ export default function MobileBookCreatePage() {
             }}
             onFocus={closeScannerForManualInput}
             onBlur={handleIsbnBlur}
-            placeholder="例如 9789866535581"
+            placeholder="例如 9789866076510"
             inputMode="numeric"
           />
         </label>
@@ -483,21 +530,17 @@ export default function MobileBookCreatePage() {
             }}
             disabled={!isbn.trim()}
           >
-            用 ISBN 帶入資料
+            用 ISBN 查資料
           </button>
-          <button
-            type="button"
-            className="ghost-button"
-            onClick={() => setScanMode("isbn")}
-          >
-            下次掃到 ISBN
+          <button type="button" className="ghost-button" onClick={() => setScanMode("isbn")}>
+            下次掃 ISBN
           </button>
           <button
             type="button"
             className="ghost-button"
             onClick={() => setScanMode("accession")}
           >
-            下次掃到館藏條碼
+            下次掃館藏條碼
           </button>
         </div>
 
@@ -528,13 +571,36 @@ export default function MobileBookCreatePage() {
 
         {lookupMessage ? <div className="feedback">{lookupMessage}</div> : null}
 
+        {lookupCandidates.length > 0 ? (
+          <div className="feedback-meta">
+            <div>
+              目前候選：{activeCandidateIndex + 1} / {lookupCandidates.length}
+            </div>
+            <div>來源：{activeCandidate?.matchedSource?.label ?? "未知來源"}</div>
+            <div>完整度：{activeCandidate?.completenessScore ?? 0} / 5</div>
+            <div>
+              已找到欄位：
+              {activeCandidate && activeCandidate.foundFields.length > 0
+                ? activeCandidate.foundFields.join("、")
+                : "尚未找到"}
+            </div>
+            {lookupCandidates.length > 1 ? (
+              <div className="inline-actions">
+                <button type="button" className="ghost-button" onClick={showNextLookupCandidate}>
+                  下一筆
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
         {lookupTrace.attemptedSources.length > 0 ? (
           <div className="feedback-meta">
             <div>查詢來源：{lookupTrace.attemptedSources.map((source) => source.label).join("、")}</div>
-            <div>命中來源：{lookupTrace.matchedSource?.label ?? "未命中"}</div>
+            <div>目前套用：{lookupTrace.matchedSource?.label ?? "尚未命中來源"}</div>
             <div>
-              已找到欄位：
-              {lookupTrace.foundFields.length > 0 ? lookupTrace.foundFields.join("、") : "尚未找到"}
+              目前欄位：
+              {lookupTrace.foundFields.length > 0 ? lookupTrace.foundFields.join("、") : "尚未找到欄位"}
             </div>
           </div>
         ) : null}
@@ -543,10 +609,10 @@ export default function MobileBookCreatePage() {
 
         {duplicateBooks.length > 0 ? (
           <div className="feedback-meta">
-            <div>同 ISBN 館藏：</div>
+            <div>此 ISBN 既有館藏：</div>
             {duplicateBooks.map((book) => (
               <div key={book.id}>
-                #{book.id}《{book.title}》 / {book.accessionCode}
+                #{book.id} {book.title} / {book.accessionCode}
               </div>
             ))}
           </div>
@@ -557,7 +623,7 @@ export default function MobileBookCreatePage() {
           <input
             value={title}
             onChange={(event) => setTitle(event.target.value)}
-            placeholder="例如 不動產疑難雜症解析：增訂版"
+            placeholder="例如 Arduino 快速上手指南"
             required
           />
         </label>
@@ -567,7 +633,7 @@ export default function MobileBookCreatePage() {
           <input
             value={author}
             onChange={(event) => setAuthor(event.target.value)}
-            placeholder="例如 趙坤麟"
+            placeholder="例如 Maik Schmidt"
           />
         </label>
 
@@ -585,7 +651,7 @@ export default function MobileBookCreatePage() {
           <input
             value={publishYear}
             onChange={(event) => setPublishYear(event.target.value)}
-            placeholder="例如 2010"
+            placeholder="例如 2012"
             inputMode="numeric"
           />
         </label>
@@ -608,13 +674,13 @@ export default function MobileBookCreatePage() {
           <textarea
             value={remark}
             onChange={(event) => setRemark(event.target.value)}
-            placeholder="可記錄櫃位、分類或來源補充說明。"
+            placeholder="可記錄書況、版本或其他補充資訊"
             rows={4}
           />
         </label>
 
         <button type="submit" className="primary-button" disabled={isPending}>
-          {isPending ? "建立中..." : "建立書籍"}
+          {isPending ? "建立書籍中..." : "建立書籍"}
         </button>
       </form>
 

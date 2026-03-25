@@ -50,6 +50,27 @@ type SearchSource = {
   productUrlPatterns: RegExp[];
 };
 
+function toIsbn10(isbn: string) {
+  const normalized = isbn.replace(/[^0-9Xx]/g, "");
+
+  if (!normalized.startsWith("978") || normalized.length !== 13) {
+    return null;
+  }
+
+  const core = normalized.slice(3, 12);
+  let sum = 0;
+
+  for (let index = 0; index < core.length; index += 1) {
+    sum += Number(core[index]) * (10 - index);
+  }
+
+  const remainder = 11 - (sum % 11);
+  const checkDigit =
+    remainder === 10 ? "X" : remainder === 11 ? "0" : String(remainder);
+
+  return `${core}${checkDigit}`;
+}
+
 type LaunchedBrowser = {
   child: ChildProcess;
   port: number;
@@ -408,10 +429,12 @@ async function extractMetadata(
   source: SearchSource,
   candidate: SearchCandidate,
 ): Promise<IsbnLookupResult | null> {
+  const isbn10 = toIsbn10(isbn);
   const evaluation = await Runtime.evaluate({
     expression: `(() => {
       const hostname = window.location.hostname || "";
       const bodyText = document.body?.innerText || "";
+      const canonical = document.querySelector('link[rel="canonical"]')?.getAttribute("href") || "";
       const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'))
         .map((node) => node.textContent || "")
         .filter(Boolean);
@@ -512,6 +535,7 @@ async function extractMetadata(
       return {
         hostname,
         bodyText,
+        canonical,
         title: firstCandidate?.name || firstCandidate?.headline || fallbackTitle,
         author: pickName(firstCandidate?.author) || fallbackAuthor,
         publisher: pickName(firstCandidate?.publisher) || pickName(firstCandidate?.brand) || fallbackPublisher,
@@ -525,6 +549,7 @@ async function extractMetadata(
   const value = evaluation.result.value as {
     hostname?: unknown;
     bodyText?: unknown;
+    canonical?: unknown;
     title?: unknown;
     author?: unknown;
     publisher?: unknown;
@@ -539,8 +564,16 @@ async function extractMetadata(
   const title = typeof value.title === "string" ? value.title.trim() : null;
   const bodyText = typeof value.bodyText === "string" ? value.bodyText : "";
   const hostname = typeof value.hostname === "string" ? value.hostname : "";
+  const canonical = typeof value.canonical === "string" ? value.canonical : "";
+  const matchesIsbn =
+    bodyText.includes(isbn) ||
+    canonical.includes(isbn) ||
+    candidate.href.includes(isbn) ||
+    (isbn10
+      ? bodyText.includes(isbn10) || canonical.includes(isbn10) || candidate.href.includes(isbn10)
+      : false);
 
-  if (!title || !bodyText.includes(isbn) || hostname !== source.domain) {
+  if (!title || !matchesIsbn || hostname !== source.domain) {
     return null;
   }
 
@@ -580,11 +613,11 @@ function pushDebug(
 export async function lookupBookByIsbnCdp(
   isbn: string,
   debugCollector?: IsbnLookupDebugCandidate[],
-): Promise<IsbnLookupResult | null> {
+): Promise<IsbnLookupResult[]> {
   const launched = await launchBrowser();
 
   if (!launched) {
-    return null;
+    return [];
   }
 
   const { child, port, userDataDir } = launched;
@@ -593,6 +626,8 @@ export async function lookupBookByIsbnCdp(
     const target = await CDP.New({ port });
     const client = await CDP({ target, port });
     const { Page, Runtime } = client;
+    const matches: IsbnLookupResult[] = [];
+    const seen = new Set<string>();
 
     for (const source of searchSources) {
       const resultUrl = source.searchUrl(isbn);
@@ -614,18 +649,26 @@ export async function lookupBookByIsbnCdp(
         const metadata = await extractMetadata(Runtime, isbn, source, candidate);
 
         if (metadata?.title) {
-          await client.close();
-          await CDP.Close({ id: target.id, port });
-          return metadata;
+          const key = [
+            metadata.title?.trim().toLowerCase() ?? "",
+            metadata.author?.trim().toLowerCase() ?? "",
+            metadata.publisher?.trim().toLowerCase() ?? "",
+            String(metadata.publishYear ?? ""),
+          ].join("|");
+
+          if (!seen.has(key)) {
+            seen.add(key);
+            matches.push(metadata);
+          }
         }
       }
     }
 
     await client.close();
     await CDP.Close({ id: target.id, port });
-    return null;
+    return matches;
   } catch {
-    return null;
+    return [];
   } finally {
     await closeBrowser(child, userDataDir);
   }
