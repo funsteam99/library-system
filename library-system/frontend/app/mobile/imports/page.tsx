@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { type ChangeEvent, useState, useTransition } from "react";
 
+import { getOperatorRequestHeaders, isAdminOperator } from "../../lib/auth";
+
 type ImportSummary = {
   item: {
     type: string;
@@ -14,6 +16,7 @@ type ImportSummary = {
 };
 
 export default function MobileImportsPage() {
+  const canImport = isAdminOperator();
   const [bookFile, setBookFile] = useState<File | null>(null);
   const [memberFile, setMemberFile] = useState<File | null>(null);
   const [bookResult, setBookResult] = useState<ImportSummary["item"] | null>(null);
@@ -21,10 +24,7 @@ export default function MobileImportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
-  function handleFileChange(
-    event: ChangeEvent<HTMLInputElement>,
-    type: "books" | "members",
-  ) {
+  function handleFileChange(event: ChangeEvent<HTMLInputElement>, type: "books" | "members") {
     const file = event.target.files?.[0] ?? null;
 
     if (type === "books") {
@@ -46,6 +46,11 @@ export default function MobileImportsPage() {
       return;
     }
 
+    if (!canImport) {
+      setError("Excel 匯入需要管理員權限。");
+      return;
+    }
+
     setError(null);
 
     startTransition(async () => {
@@ -56,6 +61,7 @@ export default function MobileImportsPage() {
         const response = await fetch(`/api/imports/${type}`, {
           method: "POST",
           body: formData,
+          headers: getOperatorRequestHeaders(),
         });
 
         if (!response.ok) {
@@ -81,16 +87,18 @@ export default function MobileImportsPage() {
       <article className="hero-card compact">
         <p className="eyebrow">Imports</p>
         <h2>Excel 匯入</h2>
-        <p>第一版支援書籍與會員 Excel 匯入。欄位請依照系統匯出格式，或使用相同中文欄位名稱。</p>
+        <p>把既有的書籍或會員 Excel 檔案匯入系統，快速建立資料。</p>
       </article>
 
       <section className="action-grid">
         <Link href="/mobile/exports" className="action-card">
-          <div className="action-badge">參考格式</div>
-          <h3>先下載匯出範本</h3>
-          <p>如果不確定欄位名稱，可先匯出現有資料作為 Excel 範本。</p>
+          <div className="action-badge">模板</div>
+          <h3>先匯出再整理</h3>
+          <p>可先下載目前資料當作欄位模板，再用同樣格式整理後匯入。</p>
         </Link>
       </section>
+
+      {!canImport ? <div className="feedback">Excel 匯入需要管理員權限，館員角色無法上傳資料。</div> : null}
 
       <section className="mobile-form">
         <label className="field">
@@ -101,7 +109,7 @@ export default function MobileImportsPage() {
           type="button"
           className="primary-button"
           onClick={() => uploadImport("books")}
-          disabled={isPending}
+          disabled={isPending || !canImport}
         >
           {isPending ? "匯入中..." : "匯入書籍"}
         </button>
@@ -131,7 +139,7 @@ export default function MobileImportsPage() {
           type="button"
           className="primary-button"
           onClick={() => uploadImport("members")}
-          disabled={isPending}
+          disabled={isPending || !canImport}
         >
           {isPending ? "匯入中..." : "匯入會員"}
         </button>

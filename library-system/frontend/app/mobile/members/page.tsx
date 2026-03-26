@@ -24,6 +24,11 @@ const statusLabels: Record<string, string> = {
   inactive: "停用中",
 };
 
+const statusClasses: Record<string, string> = {
+  active: "status-pill status-pill-returned",
+  inactive: "status-pill status-pill-overdue-returned",
+};
+
 export default function MobileMembersPage() {
   const [items, setItems] = useState<MemberItem[]>([]);
   const [keyword, setKeyword] = useState("");
@@ -123,7 +128,9 @@ export default function MobileMembersPage() {
                   <p>Email：{member.email ?? "未填寫"}</p>
                 </div>
                 <div className="book-row-side">
-                  <span className="status-pill">{statusLabels[member.status] ?? member.status}</span>
+                  <span className={statusClasses[member.status] ?? "status-pill"}>
+                    {statusLabels[member.status] ?? member.status}
+                  </span>
                   <p>{member.unitName ?? "未填寫單位"}</p>
                   <Link href={`/mobile/members/${member.id}`} className="inline-link">
                     查看

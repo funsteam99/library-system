@@ -5,7 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import { type ChangeEvent, type FormEvent, useEffect, useState, useTransition } from "react";
 
 import { CameraCapture } from "../../../../components/camera-capture";
-import { apiRequest } from "../../../../lib/api";
+import { apiRequest, resolveAssetUrl } from "../../../../lib/api";
+import { isAdminOperator } from "../../../../lib/auth";
 import { uploadImage } from "../../../../lib/upload";
 
 type MemberDetailResponse = {
@@ -25,6 +26,7 @@ type MemberDetailResponse = {
 export default function MobileMemberEditPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const canManageStatus = isAdminOperator();
   const [memberCode, setMemberCode] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -57,7 +59,7 @@ export default function MobileMemberEditPage() {
         setUnitName(data.item.unitName ?? "");
         setNote(data.item.note ?? "");
         setPhotoUrl(data.item.photoUrl ?? null);
-        setPhotoPreview(data.item.photoUrl ?? null);
+        setPhotoPreview(resolveAssetUrl(data.item.photoUrl) ?? null);
         setStatus(data.item.status);
         setError(null);
       } catch (loadError) {
@@ -192,10 +194,16 @@ export default function MobileMemberEditPage() {
 
           <label className="field">
             <span>狀態</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value)} className="field-select">
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              className="field-select"
+              disabled={!canManageStatus}
+            >
               <option value="active">active</option>
               <option value="inactive">inactive</option>
             </select>
+            {!canManageStatus ? <small>只有 admin 可以修改會員狀態。</small> : null}
           </label>
 
           <label className="field">

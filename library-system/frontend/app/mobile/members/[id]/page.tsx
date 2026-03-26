@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { apiRequest } from "../../../lib/api";
+import { apiRequest, resolveAssetUrl } from "../../../lib/api";
 
 type MemberDetail = {
   id: number;
@@ -152,7 +152,11 @@ export default function MobileMemberDetailPage({
           <section className="mobile-form">
             {member.photoUrl ? (
               <div className="cover-preview-card">
-                <img src={member.photoUrl} alt={`${member.name} 照片`} className="cover-preview-image" />
+                <img
+                  src={resolveAssetUrl(member.photoUrl) ?? undefined}
+                  alt={`${member.name} 照片`}
+                  className="cover-preview-image"
+                />
               </div>
             ) : null}
 

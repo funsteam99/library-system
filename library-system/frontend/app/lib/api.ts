@@ -13,6 +13,18 @@ export function getApiUrl(path: string) {
   return `${getApiBaseUrl()}${path}`;
 }
 
+export function resolveAssetUrl(path: string | null | undefined) {
+  if (!path) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  return getApiUrl(path);
+}
+
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(getApiUrl(path), {
     ...init,

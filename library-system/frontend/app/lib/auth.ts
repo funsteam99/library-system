@@ -60,6 +60,10 @@ export function getCurrentOperatorId() {
   return getStoredOperator().id;
 }
 
+export function isAdminOperator() {
+  return getStoredOperator().role === "admin";
+}
+
 export function getOperatorRequestHeaders() {
   return {
     "x-user-id": String(getCurrentOperatorId()),

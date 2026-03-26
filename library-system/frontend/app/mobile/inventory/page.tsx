@@ -5,7 +5,7 @@ import { type FormEvent, useEffect, useMemo, useState, useTransition } from "rea
 
 import { BarcodeScanner } from "../../components/barcode-scanner";
 import { apiRequest } from "../../lib/api";
-import { getCurrentOperatorId } from "../../lib/auth";
+import { getCurrentOperatorId, isAdminOperator } from "../../lib/auth";
 import { getApiUrl } from "../../lib/api";
 
 type InventoryResult = "found" | "wrong_shelf" | "damaged" | "missing_check";
@@ -77,6 +77,7 @@ function getResultClassName(result: InventoryResult) {
 
 export default function MobileInventoryPage() {
   const userId = getCurrentOperatorId();
+  const canManageSessions = isAdminOperator();
   const [sessions, setSessions] = useState<InventorySession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [selectedSession, setSelectedSession] = useState<InventorySessionDetailResponse["item"] | null>(null);
@@ -271,9 +272,10 @@ export default function MobileInventoryPage() {
             placeholder="例如 2026 春季盤點"
           />
         </label>
-        <button type="submit" className="primary-button" disabled={isPending}>
+        <button type="submit" className="primary-button" disabled={isPending || !canManageSessions}>
           {isPending ? "建立中..." : "建立盤點批次"}
         </button>
+        {!canManageSessions ? <small>只有 admin 可以建立或完成盤點批次。</small> : null}
       </form>
 
       <section className="mobile-form">
@@ -382,7 +384,7 @@ export default function MobileInventoryPage() {
             type="button"
             className="ghost-button"
             onClick={handleCompleteSession}
-            disabled={isPending || selectedSession.status === "completed"}
+            disabled={isPending || selectedSession.status === "completed" || !canManageSessions}
           >
             {selectedSession.status === "completed" ? "本批次已完成" : "完成本次盤點"}
           </button>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { apiRequest, getApiUrl } from "../../lib/api";
+import { apiRequest, resolveAssetUrl } from "../../lib/api";
 
 type BookStatus =
   | "available"
@@ -34,17 +34,14 @@ const statusLabels: Record<BookStatus, string> = {
   inactive: "下架停用",
 };
 
-function resolveCoverUrl(value: string | null | undefined) {
-  if (!value) {
-    return null;
-  }
-
-  if (/^https?:\/\//i.test(value)) {
-    return value;
-  }
-
-  return getApiUrl(value);
-}
+const statusClasses: Record<BookStatus, string> = {
+  available: "status-pill status-pill-returned",
+  loaned: "status-pill status-pill-loaned",
+  lost: "status-pill status-pill-overdue",
+  repair: "status-pill status-pill-overdue-returned",
+  inventory: "status-pill status-pill-loaned",
+  inactive: "status-pill",
+};
 
 export default function MobileBooksPage() {
   const [items, setItems] = useState<BooksResponse["items"]>([]);
@@ -147,7 +144,7 @@ export default function MobileBooksPage() {
                 <div className="book-cover-slot">
                   {book.coverUrl ? (
                     <img
-                      src={resolveCoverUrl(book.coverUrl) ?? undefined}
+                      src={resolveAssetUrl(book.coverUrl) ?? undefined}
                       alt={`${book.title} 封面`}
                       className="book-cover-thumb"
                       loading="lazy"
@@ -165,7 +162,9 @@ export default function MobileBooksPage() {
                 </div>
 
                 <div className="book-row-side">
-                  <span className="status-pill">{statusLabels[book.status] ?? book.status}</span>
+                  <span className={statusClasses[book.status] ?? "status-pill"}>
+                    {statusLabels[book.status] ?? book.status}
+                  </span>
                   <Link href={`/mobile/books/${book.id}/edit`} className="inline-link">
                     編輯
                   </Link>

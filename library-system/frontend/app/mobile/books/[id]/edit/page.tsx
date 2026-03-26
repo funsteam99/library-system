@@ -11,7 +11,8 @@ import {
 } from "react";
 
 import { CameraCapture } from "../../../../components/camera-capture";
-import { apiRequest } from "../../../../lib/api";
+import { apiRequest, resolveAssetUrl } from "../../../../lib/api";
+import { isAdminOperator } from "../../../../lib/auth";
 import { uploadImage } from "../../../../lib/upload";
 
 type BookStatus =
@@ -49,6 +50,7 @@ const statusOptions: Array<{ value: BookStatus; label: string }> = [
 export default function MobileBookEditPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const canManageStatus = isAdminOperator();
   const [isbn, setIsbn] = useState("");
   const [accessionCode, setAccessionCode] = useState("");
   const [title, setTitle] = useState("");
@@ -84,7 +86,7 @@ export default function MobileBookEditPage() {
         setStatus(data.item.status);
         setRemark(data.item.remark ?? "");
         setCoverUrl(data.item.coverUrl ?? null);
-        setCoverPreview(data.item.coverUrl ?? null);
+        setCoverPreview(resolveAssetUrl(data.item.coverUrl) ?? null);
         setError(null);
       } catch (loadError) {
         if (active) {
@@ -225,6 +227,7 @@ export default function MobileBookEditPage() {
               className="field-select"
               value={status}
               onChange={(event) => setStatus(event.target.value as BookStatus)}
+              disabled={!canManageStatus}
             >
               {statusOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -232,6 +235,7 @@ export default function MobileBookEditPage() {
                 </option>
               ))}
             </select>
+            {!canManageStatus ? <small>只有 admin 可以修改書籍狀態。</small> : null}
           </label>
 
           <label className="field">
