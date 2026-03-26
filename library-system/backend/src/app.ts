@@ -7,6 +7,7 @@ import morgan from "morgan";
 
 import { uploadsRoot } from "./config/paths.js";
 import { env } from "./config/env.js";
+import { attachCurrentUser } from "./lib/auth.js";
 import { HttpError } from "./lib/errors.js";
 import { booksRouter } from "./routes/books.js";
 import { importsRouter } from "./routes/imports.js";
@@ -16,6 +17,7 @@ import { inventoryRouter } from "./routes/inventory.js";
 import { loansRouter } from "./routes/loans.js";
 import { membersRouter } from "./routes/members.js";
 import { uploadsRouter } from "./routes/uploads.js";
+import { usersRouter } from "./routes/users.js";
 
 export function createApp() {
   const app = express();
@@ -34,6 +36,8 @@ export function createApp() {
 
   app.use("/uploads", express.static(path.resolve(uploadsRoot)));
   app.use("/api/health", healthRouter);
+  app.use("/api", attachCurrentUser);
+  app.use("/api/users", usersRouter);
   app.use("/api/imports", importsRouter);
   app.use("/api/exports", exportsRouter);
   app.use("/api/uploads", uploadsRouter);

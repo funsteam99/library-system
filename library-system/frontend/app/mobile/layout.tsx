@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { OperatorSwitcher } from "../components/operator-switcher";
+
 const navItems = [
   { href: "/mobile", label: "首頁" },
   { href: "/mobile/loan", label: "借還" },
@@ -18,11 +20,14 @@ export default function MobileLayout({
         <header className="mobile-header">
           <div>
             <p className="eyebrow">Library PWA</p>
-            <h1 className="mobile-title">行動圖書館</h1>
+            <h1 className="mobile-title">圖書館行動作業</h1>
           </div>
-          <Link href="/" className="mini-link">
-            回首頁
-          </Link>
+          <div className="mobile-header-actions">
+            <OperatorSwitcher />
+            <Link href="/" className="mini-link">
+              返回首頁
+            </Link>
+          </div>
         </header>
 
         {children}

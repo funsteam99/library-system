@@ -18,6 +18,7 @@ import {
   scanInventoryItemSchema,
 } from "../features/inventory/schemas.js";
 import { asyncHandler } from "../lib/async-handler.js";
+import { getCurrentUser, requireAdmin } from "../lib/auth.js";
 import { HttpError } from "../lib/errors.js";
 import { requireParam } from "../lib/params.js";
 import { parseId } from "../lib/parse-int.js";
@@ -34,10 +35,15 @@ inventoryRouter.get(
 
 inventoryRouter.post(
   "/sessions",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     try {
       const input = createInventorySessionSchema.parse(req.body);
-      const row = await createInventorySession(input);
+      const currentUser = getCurrentUser(res);
+      const row = await createInventorySession({
+        ...input,
+        startedByUserId: currentUser.id,
+      });
       res.status(201).json({ item: mapInventorySession(row) });
     } catch (error) {
       if (error instanceof ZodError) {
@@ -95,6 +101,7 @@ inventoryRouter.post(
 
     try {
       const input = scanInventoryItemSchema.parse(req.body);
+      const currentUser = getCurrentUser(res);
       const book = await getBookByBarcode(input.bookCode);
 
       if (!book) {
@@ -104,7 +111,7 @@ inventoryRouter.post(
       const row = await upsertInventoryItem({
         inventorySessionId: id,
         bookId: book.id,
-        scannedByUserId: input.operatorUserId ?? 1,
+        scannedByUserId: currentUser.id,
         result: input.result ?? "found",
         shelfIdAtScan: book.shelf_id ?? null,
         remark: input.remark ?? null,
@@ -130,6 +137,7 @@ inventoryRouter.post(
 
 inventoryRouter.post(
   "/sessions/:id/complete",
+  requireAdmin,
   asyncHandler(async (req, res) => {
     const id = parseId(requireParam(req.params.id, "id"));
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { apiRequest } from "../../lib/api";
+import { apiRequest, getApiUrl } from "../../lib/api";
 
 type BookStatus =
   | "available"
@@ -34,6 +34,18 @@ const statusLabels: Record<BookStatus, string> = {
   inactive: "下架停用",
 };
 
+function resolveCoverUrl(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  if (/^https?:\/\//i.test(value)) {
+    return value;
+  }
+
+  return getApiUrl(value);
+}
+
 export default function MobileBooksPage() {
   const [items, setItems] = useState<BooksResponse["items"]>([]);
   const [keyword, setKeyword] = useState("");
@@ -46,14 +58,19 @@ export default function MobileBooksPage() {
     async function loadBooks() {
       try {
         const data = await apiRequest<BooksResponse>("/api/books");
-        if (active) {
-          setItems(data.items);
-          setError(null);
+
+        if (!active) {
+          return;
         }
+
+        setItems(data.items);
+        setError(null);
       } catch (loadError) {
-        if (active) {
-          setError(loadError instanceof Error ? loadError.message : "書籍清單載入失敗。");
+        if (!active) {
+          return;
         }
+
+        setError(loadError instanceof Error ? loadError.message : "書籍清單載入失敗");
       } finally {
         if (active) {
           setLoading(false);
@@ -87,19 +104,19 @@ export default function MobileBooksPage() {
       <article className="hero-card compact">
         <p className="eyebrow">Books</p>
         <h2>書籍清單</h2>
-        <p>可依書名、作者、館藏條碼或 ISBN 搜尋，也能直接看到封面與狀態。</p>
+        <p>可搜尋書名、館藏條碼、作者或 ISBN，並直接進入編輯。</p>
       </article>
 
       <section className="action-grid">
         <Link href="/mobile/books/new" className="action-card">
           <div className="action-badge">新增</div>
           <h3>建立新書籍</h3>
-          <p>支援 ISBN 掃碼、館藏條碼與封面拍照建檔。</p>
+          <p>掃 ISBN、補封面與欄位後，快速完成建檔。</p>
         </Link>
         <Link href="/mobile" className="action-card">
           <div className="action-badge">首頁</div>
-          <h3>回到首頁</h3>
-          <p>可回借還、盤點與會員管理入口。</p>
+          <h3>返回首頁</h3>
+          <p>回到借還、會員、盤點等主要入口。</p>
         </Link>
       </section>
 
@@ -117,20 +134,23 @@ export default function MobileBooksPage() {
       <section className="books-list">
         {loading ? <div className="feedback">載入中...</div> : null}
         {error ? <div className="feedback error">{error}</div> : null}
+
         {!loading && !error && filteredItems.length === 0 ? (
           <div className="feedback">
-            {keyword ? "查不到符合條件的書籍。" : "目前還沒有書籍資料。"}
+            {keyword ? "查無符合搜尋條件的書籍" : "目前還沒有書籍資料"}
           </div>
         ) : null}
+
         {!loading && !error
           ? filteredItems.map((book) => (
               <article key={book.id} className="book-row book-row-with-cover">
                 <div className="book-cover-slot">
                   {book.coverUrl ? (
                     <img
-                      src={book.coverUrl}
+                      src={resolveCoverUrl(book.coverUrl) ?? undefined}
                       alt={`${book.title} 封面`}
                       className="book-cover-thumb"
+                      loading="lazy"
                     />
                   ) : (
                     <div className="book-cover-placeholder">無封面</div>

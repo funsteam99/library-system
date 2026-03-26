@@ -579,6 +579,34 @@ button {
   background: color-mix(in oklab, white 75%, var(--paper-strong) 25%);
 }
 
+.mobile-header-actions {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+}
+
+.operator-switcher {
+  display: grid;
+  gap: 4px;
+  min-width: 176px;
+}
+
+.operator-switcher-label,
+.operator-switcher-meta {
+  margin: 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.operator-switcher-select {
+  min-height: 38px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: color-mix(in oklab, white 82%, var(--paper) 18%);
+  padding: 0 12px;
+  color: var(--ink);
+}
+
 @media (max-width: 720px) {
   .landing-duo {
     grid-template-columns: 1fr;
@@ -599,5 +627,10 @@ button {
   .bottom-nav-link {
     min-height: 42px;
     font-size: 12px;
+  }
+
+  .mobile-header-actions,
+  .operator-switcher {
+    width: 100%;
   }
 }

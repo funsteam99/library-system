@@ -4,6 +4,7 @@ import { useCallback, useState, useTransition } from "react";
 
 import { BarcodeScanner } from "../../components/barcode-scanner";
 import { apiRequest } from "../../lib/api";
+import { getCurrentOperatorId } from "../../lib/auth";
 
 type ReturnResponse = {
   item: {
@@ -36,7 +37,7 @@ export default function MobileReturnPage() {
           method: "POST",
           body: JSON.stringify({
             bookCode,
-            operatorUserId: 1,
+            operatorUserId: getCurrentOperatorId(),
           }),
         });
 

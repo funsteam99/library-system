@@ -1,10 +1,14 @@
+import { getOperatorRequestHeaders } from "./auth";
+import { getApiUrl } from "./api";
+
 export async function uploadImage(path: string, file: File) {
   const formData = new FormData();
   formData.append("file", file);
 
-  const response = await fetch(path, {
+  const response = await fetch(getApiUrl(path), {
     method: "POST",
     body: formData,
+    headers: typeof window === "undefined" ? undefined : getOperatorRequestHeaders(),
   });
 
   if (!response.ok) {

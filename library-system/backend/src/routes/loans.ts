@@ -10,6 +10,7 @@ import {
 } from "../features/loans/repository.js";
 import { checkoutSchema, returnSchema } from "../features/loans/schemas.js";
 import { asyncHandler } from "../lib/async-handler.js";
+import { getCurrentUser } from "../lib/auth.js";
 import { HttpError } from "../lib/errors.js";
 
 export const loansRouter = Router();
@@ -35,7 +36,11 @@ loansRouter.post(
   asyncHandler(async (req, res) => {
     try {
       const input = checkoutSchema.parse(req.body);
-      const row = await checkoutLoan(input);
+      const currentUser = getCurrentUser(res);
+      const row = await checkoutLoan({
+        ...input,
+        operatorUserId: currentUser.id,
+      });
       res.status(201).json({ item: mapLoan(row) });
     } catch (error) {
       if (error instanceof ZodError) {
@@ -52,7 +57,11 @@ loansRouter.post(
   asyncHandler(async (req, res) => {
     try {
       const input = returnSchema.parse(req.body);
-      const row = await returnLoan(input);
+      const currentUser = getCurrentUser(res);
+      const row = await returnLoan({
+        ...input,
+        operatorUserId: currentUser.id,
+      });
       res.json({ item: mapLoan(row) });
     } catch (error) {
       if (error instanceof ZodError) {

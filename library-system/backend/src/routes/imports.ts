@@ -5,9 +5,11 @@ import * as XLSX from "xlsx";
 import { createBook, getBookByAccessionCode } from "../features/books/repository.js";
 import { createMember, getMemberByCode } from "../features/members/repository.js";
 import { asyncHandler } from "../lib/async-handler.js";
+import { requireAdmin } from "../lib/auth.js";
 import { HttpError } from "../lib/errors.js";
 
 export const importsRouter = Router();
+importsRouter.use(requireAdmin);
 
 const upload = multer({
   storage: multer.memoryStorage(),

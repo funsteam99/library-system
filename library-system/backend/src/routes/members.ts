@@ -13,6 +13,7 @@ import {
 import { createMemberSchema, updateMemberSchema } from "../features/members/schemas.js";
 import { mapLoan } from "../features/loans/mapper.js";
 import { asyncHandler } from "../lib/async-handler.js";
+import { getCurrentUser } from "../lib/auth.js";
 import { HttpError } from "../lib/errors.js";
 import { requireParam } from "../lib/params.js";
 import { parseId } from "../lib/parse-int.js";
@@ -95,6 +96,12 @@ membersRouter.patch(
 
     try {
       const input = updateMemberSchema.parse(req.body);
+      const currentUser = getCurrentUser(res);
+
+      if (input.status && currentUser.role !== "admin") {
+        throw new HttpError(403, "Only admins can change member status");
+      }
+
       const row = await updateMember(id, input);
 
       if (!row) {

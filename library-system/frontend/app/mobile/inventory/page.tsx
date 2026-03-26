@@ -5,6 +5,8 @@ import { type FormEvent, useEffect, useMemo, useState, useTransition } from "rea
 
 import { BarcodeScanner } from "../../components/barcode-scanner";
 import { apiRequest } from "../../lib/api";
+import { getCurrentOperatorId } from "../../lib/auth";
+import { getApiUrl } from "../../lib/api";
 
 type InventoryResult = "found" | "wrong_shelf" | "damaged" | "missing_check";
 
@@ -74,6 +76,7 @@ function getResultClassName(result: InventoryResult) {
 }
 
 export default function MobileInventoryPage() {
+  const userId = getCurrentOperatorId();
   const [sessions, setSessions] = useState<InventorySession[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<number | null>(null);
   const [selectedSession, setSelectedSession] = useState<InventorySessionDetailResponse["item"] | null>(null);
@@ -144,7 +147,7 @@ export default function MobileInventoryPage() {
           method: "POST",
           body: JSON.stringify({
             name: newSessionName || `盤點 ${new Date().toLocaleDateString("zh-TW")}`,
-            startedByUserId: 1,
+            startedByUserId: getCurrentOperatorId(),
           }),
         });
 
@@ -176,7 +179,7 @@ export default function MobileInventoryPage() {
             method: "POST",
             body: JSON.stringify({
               bookCode,
-              operatorUserId: 1,
+              operatorUserId: getCurrentOperatorId(),
               result: scanResult,
               remark: scanRemark.trim() || null,
             }),
@@ -251,7 +254,7 @@ export default function MobileInventoryPage() {
           <p>盤點時需要對照館藏資料，可快速切到書籍清單。</p>
         </Link>
         {selectedSessionId ? (
-          <a href={`/api/exports/inventory/${selectedSessionId}.xlsx`} className="action-card">
+          <a href={getApiUrl(`/api/exports/inventory/${selectedSessionId}.xlsx?userId=${userId}`)} className="action-card">
             <div className="action-badge">匯出</div>
             <h3>下載盤點結果</h3>
             <p>匯出這次盤點的已掃到與未掃到清單。</p>

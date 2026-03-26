@@ -10,11 +10,13 @@ import {
 import { listLoans } from "../features/loans/repository.js";
 import { listMembers } from "../features/members/repository.js";
 import { asyncHandler } from "../lib/async-handler.js";
+import { requireAdmin } from "../lib/auth.js";
 import { HttpError } from "../lib/errors.js";
 import { requireParam } from "../lib/params.js";
 import { parseId } from "../lib/parse-int.js";
 
 export const exportsRouter = Router();
+exportsRouter.use(requireAdmin);
 
 function sendWorkbook(
   res: {

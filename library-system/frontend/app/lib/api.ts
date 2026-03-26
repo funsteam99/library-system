@@ -1,10 +1,24 @@
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+import { getOperatorRequestHeaders } from "./auth";
+
+const ENV_API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "";
+
+export function getApiBaseUrl() {
+  if (ENV_API_BASE_URL) {
+    return ENV_API_BASE_URL;
+  }
+  return "";
+}
+
+export function getApiUrl(path: string) {
+  return `${getApiBaseUrl()}${path}`;
+}
 
 export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  const response = await fetch(getApiUrl(path), {
     ...init,
     headers: {
       "Content-Type": "application/json",
+      ...(typeof window === "undefined" ? {} : getOperatorRequestHeaders()),
       ...(init?.headers ?? {}),
     },
     cache: "no-store",

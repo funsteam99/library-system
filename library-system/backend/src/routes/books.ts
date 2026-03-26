@@ -2,6 +2,7 @@ import { Router } from "express";
 import { ZodError } from "zod";
 
 import { asyncHandler } from "../lib/async-handler.js";
+import { getCurrentUser } from "../lib/auth.js";
 import { HttpError } from "../lib/errors.js";
 import { requireParam } from "../lib/params.js";
 import { parseId } from "../lib/parse-int.js";
@@ -131,6 +132,12 @@ booksRouter.patch(
 
     try {
       const input = updateBookSchema.parse(req.body);
+      const currentUser = getCurrentUser(res);
+
+      if (input.status && currentUser.role !== "admin") {
+        throw new HttpError(403, "Only admins can change book status");
+      }
+
       const row = await updateBook(id, input);
 
       if (!row) {

@@ -4,6 +4,7 @@ import { useCallback, useState, useTransition } from "react";
 
 import { BarcodeScanner } from "../../components/barcode-scanner";
 import { apiRequest } from "../../lib/api";
+import { getCurrentOperatorId } from "../../lib/auth";
 
 type LoanResponse = {
   item: {
@@ -44,7 +45,7 @@ export default function MobileLoanPage() {
           body: JSON.stringify({
             memberCode,
             bookCode,
-            operatorUserId: 1,
+            operatorUserId: getCurrentOperatorId(),
             loanDays: Number(loanDays || "14"),
           }),
         });
