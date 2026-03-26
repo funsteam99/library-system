@@ -259,6 +259,94 @@ export async function returnLoan(input: {
   }
 }
 
+export async function forceReturnLoan(input: {
+  loanId: number;
+  operatorUserId: number;
+  remark?: string | null;
+}) {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const operator = await getUserById(client, input.operatorUserId);
+    if (!operator || operator.status !== "active") {
+      throw new HttpError(400, "Operator user is invalid");
+    }
+
+    const loanResult = await client.query<LoanDetailRow>(
+      `SELECT
+         l.*,
+         b.title AS book_title,
+         b.accession_code AS book_accession_code,
+         m.name AS member_name,
+         m.member_code
+       FROM loans l
+       INNER JOIN books b ON b.id = l.book_id
+       INNER JOIN members m ON m.id = l.member_id
+       WHERE l.id = $1
+       LIMIT 1`,
+      [input.loanId],
+    );
+
+    const loan = loanResult.rows[0] ?? null;
+    if (!loan) {
+      throw new HttpError(404, "Loan not found");
+    }
+
+    if (loan.returned_at) {
+      throw new HttpError(400, "Loan has already been returned");
+    }
+
+    const nextStatus = new Date(loan.due_date).getTime() < Date.now() ? "overdue" : "returned";
+    const nextRemark =
+      [loan.remark, input.remark, `[force-return by user ${input.operatorUserId}]`]
+        .filter(Boolean)
+        .join("\n") || null;
+
+    await client.query(
+      `UPDATE loans
+       SET returned_at = NOW(),
+           status = $1,
+           return_by_user_id = $2,
+           remark = $3,
+           updated_at = NOW()
+       WHERE id = $4`,
+      [nextStatus, input.operatorUserId, nextRemark, loan.id],
+    );
+
+    await client.query(
+      `UPDATE books
+       SET status = 'available',
+           updated_at = NOW()
+       WHERE id = $1`,
+      [loan.book_id],
+    );
+
+    const detailResult = await client.query<LoanDetailRow>(
+      `SELECT
+         l.*,
+         b.title AS book_title,
+         b.accession_code AS book_accession_code,
+         m.name AS member_name,
+         m.member_code
+       FROM loans l
+       INNER JOIN books b ON b.id = l.book_id
+       INNER JOIN members m ON m.id = l.member_id
+       WHERE l.id = $1`,
+      [loan.id],
+    );
+
+    await client.query("COMMIT");
+    return detailResult.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export async function listLoans() {
   const result = await query<LoanDetailRow>(
     `SELECT

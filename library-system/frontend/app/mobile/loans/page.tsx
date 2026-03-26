@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { apiRequest } from "../../lib/api";
+import { isAdminOperator } from "../../lib/auth";
 
 type LoanItem = {
   id: number;
@@ -83,12 +84,24 @@ function getLoanStatusView(item: LoanItem, overdueIds: Set<number>) {
 }
 
 export default function MobileLoansPage() {
+  const canManageLoans = isAdminOperator();
   const [items, setItems] = useState<LoanItem[]>([]);
   const [overdueIds, setOverdueIds] = useState<Set<number>>(new Set());
   const [filter, setFilter] = useState<LoanFilter>("all");
   const [keyword, setKeyword] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+
+  async function refreshLoans() {
+    const [allLoans, overdueLoans] = await Promise.all([
+      apiRequest<LoansResponse>("/api/loans"),
+      apiRequest<LoansResponse>("/api/loans/overdue"),
+    ]);
+
+    setItems(allLoans.items);
+    setOverdueIds(new Set(overdueLoans.items.map((item) => item.id)));
+  }
 
   useEffect(() => {
     let active = true;
@@ -109,7 +122,7 @@ export default function MobileLoansPage() {
         setError(null);
       } catch (loadError) {
         if (active) {
-          setError(loadError instanceof Error ? loadError.message : "讀取借閱資料時發生錯誤。");
+          setError(loadError instanceof Error ? loadError.message : "讀取借閱紀錄失敗");
         }
       } finally {
         if (active) {
@@ -124,6 +137,32 @@ export default function MobileLoansPage() {
       active = false;
     };
   }, []);
+
+  async function handleForceReturn(item: LoanItem) {
+    if (!canManageLoans || item.returnedAt !== null) {
+      return;
+    }
+
+    const confirmed = window.confirm(`確定要強制歸還《${item.book.title}》嗎？`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      setError(null);
+      setMessage(null);
+      await apiRequest(`/api/loans/${item.id}/force-return`, {
+        method: "POST",
+        body: JSON.stringify({
+          remark: "Force return from loan records page",
+        }),
+      });
+      await refreshLoans();
+      setMessage(`已強制歸還《${item.book.title}》`);
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "借閱修正失敗");
+    }
+  }
 
   const summary = useMemo(() => {
     const activeLoans = items.filter((item) => item.returnedAt === null);
@@ -151,12 +190,7 @@ export default function MobileLoansPage() {
     }
 
     return byStatus.filter((item) =>
-      [
-        item.book.title,
-        item.book.accessionCode,
-        item.member.name,
-        item.member.memberCode,
-      ]
+      [item.book.title, item.book.accessionCode, item.member.name, item.member.memberCode]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalized)),
     );
@@ -167,38 +201,42 @@ export default function MobileLoansPage() {
       <article className="hero-card compact">
         <p className="eyebrow">Loan records</p>
         <h2>借閱紀錄</h2>
-        <p>集中查看全部借閱、目前借出中，以及尚未歸還的逾期書籍。</p>
+        <p>查看目前借出中、逾期中與已歸還的借閱資料；管理員可在這裡做保守版修正。</p>
       </article>
 
       <section className="status-panel">
         <div>
           <p className="eyebrow">全部紀錄</p>
           <strong>{summary.total}</strong>
-          <p>累積借閱與歸還歷史。</p>
+          <p>累計借閱筆數</p>
         </div>
         <div>
           <p className="eyebrow">借出中</p>
           <strong>{summary.active}</strong>
-          <p>尚未歸還的館藏。</p>
+          <p>尚未歸還的借閱</p>
         </div>
         <div>
           <p className="eyebrow">逾期中</p>
           <strong>{summary.overdue}</strong>
-          <p>到期未還，需要追蹤。</p>
+          <p>需要追蹤的借閱</p>
         </div>
         <div>
-          <p className="eyebrow">快捷入口</p>
+          <p className="eyebrow">快速入口</p>
           <Link href="/mobile/loan" className="inline-link">
-            去借書
+            前往借書
           </Link>
-          <p>也可切到還書頁處理歸還。</p>
+          <p>也可從首頁進入還書流程</p>
         </div>
       </section>
 
+      {canManageLoans ? (
+        <div className="feedback">目前使用 admin，可在借出中的紀錄上使用「強制歸還」。</div>
+      ) : null}
+
       <section className="mobile-form">
         <div className="field">
-          <span>篩選紀錄</span>
-          <div className="segmented-control" role="tablist" aria-label="借閱篩選">
+          <span>篩選狀態</span>
+          <div className="segmented-control" role="tablist" aria-label="借閱紀錄篩選">
             {filterOptions.map((option) => (
               <button
                 key={option.value}
@@ -217,21 +255,23 @@ export default function MobileLoansPage() {
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="可輸入書名、館藏條碼、會員姓名或會員編號"
+            placeholder="輸入書名、館藏條碼、會員姓名或會員編號"
           />
         </label>
       </section>
 
       <section className="books-list">
         {loading ? <div className="feedback">讀取借閱紀錄中...</div> : null}
+        {message ? <div className="feedback success">{message}</div> : null}
         {error ? <div className="feedback error">{error}</div> : null}
+
         {!loading && !error && filteredItems.length === 0 ? (
           <div className="feedback">
             {keyword
-              ? "查無符合搜尋條件的借閱紀錄。"
+              ? "查無符合搜尋條件的借閱紀錄"
               : filter === "overdue"
-                ? "目前沒有逾期中的借閱。"
-                : "目前沒有符合條件的借閱紀錄。"}
+                ? "目前沒有逾期中的借閱"
+                : "目前沒有借閱紀錄"}
           </div>
         ) : null}
 
@@ -256,6 +296,15 @@ export default function MobileLoansPage() {
 
                   <div className="book-row-side">
                     <span className={statusView.className}>{statusView.label}</span>
+                    {canManageLoans && item.returnedAt === null ? (
+                      <button
+                        type="button"
+                        className="inline-link"
+                        onClick={() => void handleForceReturn(item)}
+                      >
+                        強制歸還
+                      </button>
+                    ) : null}
                   </div>
                 </article>
               );

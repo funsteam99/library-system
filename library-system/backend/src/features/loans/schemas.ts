@@ -14,3 +14,7 @@ export const returnSchema = z.object({
   operatorUserId: z.number().int().positive(),
   remark: z.string().trim().optional().nullable(),
 });
+
+export const forceReturnSchema = z.object({
+  remark: z.string().trim().optional().nullable(),
+});
