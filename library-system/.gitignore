@@ -13,6 +13,8 @@ infra/caddy/caddy.log
 infra/caddy/rootCA.pem
 infra/caddy/certs/
 
+backups/
+
 *.log
 *.tmp
 tmp-test.png

@@ -300,3 +300,11 @@ npm run dev
 - 多館 / 多書櫃
 - 權限分級
 - Docker Compose / NAS 部署檔
+## Backup / Restore
+
+- [backup-db.ps1](/C:/Users/user/Documents/Playground/library-system/scripts/backup-db.ps1)
+- [backup-uploads.ps1](/C:/Users/user/Documents/Playground/library-system/scripts/backup-uploads.ps1)
+- [run-backup.ps1](/C:/Users/user/Documents/Playground/library-system/scripts/run-backup.ps1)
+- [register-backup-task.ps1](/C:/Users/user/Documents/Playground/library-system/scripts/register-backup-task.ps1)
+- [restore-db.ps1](/C:/Users/user/Documents/Playground/library-system/scripts/restore-db.ps1)
+- [BACKUP.md](/C:/Users/user/Documents/Playground/library-system/docs/BACKUP.md)
