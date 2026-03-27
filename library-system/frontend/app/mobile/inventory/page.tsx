@@ -4,9 +4,8 @@ import Link from "next/link";
 import { type FormEvent, useEffect, useMemo, useState, useTransition } from "react";
 
 import { BarcodeScanner } from "../../components/barcode-scanner";
-import { apiRequest } from "../../lib/api";
+import { apiRequest, getApiUrl } from "../../lib/api";
 import { getCurrentOperatorId, isAdminOperator } from "../../lib/auth";
-import { getApiUrl } from "../../lib/api";
 
 type InventoryResult = "found" | "wrong_shelf" | "damaged" | "missing_check";
 
@@ -19,6 +18,7 @@ type InventorySession = {
   completedAt: string | null;
   scannedCount: number;
   anomalyCount: number;
+  remark?: string | null;
 };
 
 type InventoryItem = {
@@ -50,10 +50,10 @@ type InventorySessionDetailResponse = {
 };
 
 const resultOptions: Array<{ value: InventoryResult; label: string; description: string }> = [
-  { value: "found", label: "在架", description: "正常掃到，在正確位置。" },
-  { value: "wrong_shelf", label: "錯櫃", description: "有找到，但位置不正確。" },
-  { value: "damaged", label: "損壞", description: "掃到時發現破損或需處理。" },
-  { value: "missing_check", label: "待查", description: "疑似異常，需後續確認。" },
+  { value: "found", label: "在架", description: "確認書籍在架上，屬於正常盤點結果。" },
+  { value: "wrong_shelf", label: "錯櫃", description: "書有掃到，但位置不正確。" },
+  { value: "damaged", label: "損壞", description: "盤點時發現書況異常。" },
+  { value: "missing_check", label: "待查", description: "需要後續人工確認的異常。" },
 ];
 
 const resultLabels: Record<InventoryResult, string> = {
@@ -73,6 +73,14 @@ function getResultClassName(result: InventoryResult) {
   }
 
   return "status-pill status-pill-overdue";
+}
+
+function formatDateTime(value: string | null) {
+  if (!value) {
+    return "尚未完成";
+  }
+
+  return new Date(value).toLocaleString("zh-TW");
 }
 
 export default function MobileInventoryPage() {
@@ -116,7 +124,7 @@ export default function MobileInventoryPage() {
         }
       } catch (loadError) {
         if (active) {
-          setError(loadError instanceof Error ? loadError.message : "讀取盤點資料時發生錯誤。");
+          setError(loadError instanceof Error ? loadError.message : "讀取盤點資料失敗");
         }
       } finally {
         if (active) {
@@ -156,7 +164,7 @@ export default function MobileInventoryPage() {
         await loadSessions(payload.item.id);
         setMessage(`已建立盤點批次：${payload.item.name}`);
       } catch (submitError) {
-        setError(submitError instanceof Error ? submitError.message : "建立盤點批次失敗。");
+        setError(submitError instanceof Error ? submitError.message : "建立盤點批次失敗");
       }
     });
   }
@@ -174,27 +182,28 @@ export default function MobileInventoryPage() {
 
     startTransition(async () => {
       try {
-        const payload = await apiRequest<{ item: { title?: string; accessionCode?: string; result: InventoryResult } }>(
-          `/api/inventory/sessions/${selectedSessionId}/scan`,
-          {
-            method: "POST",
-            body: JSON.stringify({
-              bookCode,
-              operatorUserId: getCurrentOperatorId(),
-              result: scanResult,
-              remark: scanRemark.trim() || null,
-            }),
-          },
-        );
+        const payload = await apiRequest<{
+          item: { title?: string; accessionCode?: string; result: InventoryResult };
+        }>(`/api/inventory/sessions/${selectedSessionId}/scan`, {
+          method: "POST",
+          body: JSON.stringify({
+            bookCode,
+            operatorUserId: getCurrentOperatorId(),
+            result: scanResult,
+            remark: scanRemark.trim() || null,
+          }),
+        });
 
         await loadSessions(selectedSessionId);
         setBookCode("");
         setScanRemark("");
         setMessage(
-          `已記錄《${payload.item.title ?? "未命名書籍"}》 / ${payload.item.accessionCode ?? "未知條碼"} 為 ${resultLabels[payload.item.result]}`,
+          `已記錄《${payload.item.title ?? "未命名書籍"}》 / ${payload.item.accessionCode ?? "無館藏條碼"} / ${
+            resultLabels[payload.item.result]
+          }`,
         );
       } catch (submitError) {
-        setError(submitError instanceof Error ? submitError.message : "盤點掃描失敗。");
+        setError(submitError instanceof Error ? submitError.message : "盤點掃描失敗");
       }
     });
   }
@@ -221,9 +230,9 @@ export default function MobileInventoryPage() {
         });
 
         await loadSessions(selectedSessionId);
-        setMessage(`已完成盤點，本次未掃到 ${payload.item.missingCount} 本書。`);
+        setMessage(`已完成盤點，未掃到 ${payload.item.missingCount} 本。`);
       } catch (submitError) {
-        setError(submitError instanceof Error ? submitError.message : "完成盤點失敗。");
+        setError(submitError instanceof Error ? submitError.message : "完成盤點失敗");
       }
     });
   }
@@ -237,6 +246,7 @@ export default function MobileInventoryPage() {
       damaged: scannedItems.filter((item) => item.result === "damaged").length,
       missingCheck: scannedItems.filter((item) => item.result === "missing_check").length,
       missingBooks: selectedSession?.missingBooks.length ?? 0,
+      anomalies: scannedItems.filter((item) => item.result !== "found"),
     };
   }, [selectedSession]);
 
@@ -245,20 +255,20 @@ export default function MobileInventoryPage() {
       <article className="hero-card compact">
         <p className="eyebrow">Inventory</p>
         <h2>盤點</h2>
-        <p>建立盤點批次後可持續掃描，並記錄在架、錯櫃、損壞與待查，完成後直接查看未掃到清單。</p>
+        <p>建立盤點批次、掃描館藏、記錄異常，並直接在手機上查看差異摘要與未掃到清單。</p>
       </article>
 
       <section className="action-grid compact">
         <Link href="/mobile/books" className="action-card">
           <div className="action-badge">書籍</div>
           <h3>查看書籍清單</h3>
-          <p>盤點時需要對照館藏資料，可快速切到書籍清單。</p>
+          <p>盤點前可先確認館藏資料是否完整。</p>
         </Link>
         {selectedSessionId ? (
           <a href={getApiUrl(`/api/exports/inventory/${selectedSessionId}.xlsx?userId=${userId}`)} className="action-card">
-            <div className="action-badge">匯出</div>
-            <h3>下載盤點結果</h3>
-            <p>匯出這次盤點的已掃到與未掃到清單。</p>
+            <div className="action-badge">報表</div>
+            <h3>匯出盤點 Excel</h3>
+            <p>下載摘要、已掃描、異常與未掃到清單。</p>
           </a>
         ) : null}
       </section>
@@ -269,7 +279,7 @@ export default function MobileInventoryPage() {
           <input
             value={newSessionName}
             onChange={(event) => setNewSessionName(event.target.value)}
-            placeholder="例如 2026 春季盤點"
+            placeholder="例如：2026 年春季盤點"
           />
         </label>
         <button type="submit" className="primary-button" disabled={isPending || !canManageSessions}>
@@ -306,7 +316,7 @@ export default function MobileInventoryPage() {
 
       <BarcodeScanner
         label="掃描盤點書籍"
-        helperText="可掃館藏條碼或 ISBN；掃到後再依實際情況選擇在架、錯櫃、損壞或待查。"
+        helperText="掃描館藏條碼或 ISBN，系統會依你選擇的盤點結果寫入本次批次。"
         onDetected={handleDetected}
       />
 
@@ -343,7 +353,7 @@ export default function MobileInventoryPage() {
           <textarea
             value={scanRemark}
             onChange={(event) => setScanRemark(event.target.value)}
-            placeholder="例如 放在錯誤書櫃、封面脫落、需要後續確認。"
+            placeholder="例如：封面破損、放錯櫃、待人工複查"
             rows={3}
           />
         </label>
@@ -362,21 +372,42 @@ export default function MobileInventoryPage() {
               <p>{selectedSession.status}</p>
             </div>
             <div>
-              <p className="eyebrow">已掃到</p>
+              <p className="eyebrow">已掃描</p>
               <strong>{selectedSession.scannedCount}</strong>
               <p>異常 {selectedSession.anomalyCount} 本</p>
             </div>
             <div>
               <p className="eyebrow">未掃到</p>
               <strong>{summary.missingBooks}</strong>
-              <p>完成盤點後可匯出差異表。</p>
+              <p>完成盤點後列入差異表</p>
             </div>
             <div>
-              <p className="eyebrow">異常摘要</p>
-              <strong>
-                錯櫃 {summary.wrongShelf} / 損壞 {summary.damaged}
-              </strong>
-              <p>待查 {summary.missingCheck} 本</p>
+              <p className="eyebrow">完成時間</p>
+              <strong>{formatDateTime(selectedSession.completedAt)}</strong>
+              <p>開始：{formatDateTime(selectedSession.startedAt)}</p>
+            </div>
+          </section>
+
+          <section className="status-panel">
+            <div>
+              <p className="eyebrow">在架</p>
+              <strong>{summary.found}</strong>
+              <p>正常掃描</p>
+            </div>
+            <div>
+              <p className="eyebrow">錯櫃</p>
+              <strong>{summary.wrongShelf}</strong>
+              <p>位置異常</p>
+            </div>
+            <div>
+              <p className="eyebrow">損壞</p>
+              <strong>{summary.damaged}</strong>
+              <p>需處理書況</p>
+            </div>
+            <div>
+              <p className="eyebrow">待查</p>
+              <strong>{summary.missingCheck}</strong>
+              <p>待人工複核</p>
             </div>
           </section>
 
@@ -391,21 +422,48 @@ export default function MobileInventoryPage() {
 
           <section className="books-list">
             <article className="hero-card compact">
+              <p className="eyebrow">Anomalies</p>
+              <h2>異常清單</h2>
+              <p>把錯櫃、損壞與待查的館藏集中列出，方便後續處理。</p>
+            </article>
+
+            {summary.anomalies.length === 0 ? (
+              <div className="feedback success">目前沒有異常項目。</div>
+            ) : (
+              summary.anomalies.map((item) => (
+                <article key={item.id} className="book-row">
+                  <div className="book-row-main">
+                    <h3>{item.title ?? "未命名書籍"}</h3>
+                    <p>館藏條碼：{item.accessionCode ?? "無"}</p>
+                    <p>ISBN：{item.isbn ?? "無"}</p>
+                    <p>掃描時間：{formatDateTime(item.scannedAt)}</p>
+                    {item.remark ? <p>備註：{item.remark}</p> : null}
+                  </div>
+                  <div className="book-row-side">
+                    <span className={getResultClassName(item.result)}>{resultLabels[item.result]}</span>
+                  </div>
+                </article>
+              ))
+            )}
+          </section>
+
+          <section className="books-list">
+            <article className="hero-card compact">
               <p className="eyebrow">Scanned items</p>
-              <h2>已掃到清單</h2>
-              <p>每一筆都保留掃描結果與備註，方便盤點後回頭追蹤。</p>
+              <h2>已掃描清單</h2>
+              <p>列出本次盤點已經掃到的館藏與結果。</p>
             </article>
 
             {selectedSession.scannedItems.length === 0 ? (
-              <div className="feedback">目前還沒有掃到任何館藏。</div>
+              <div className="feedback">目前還沒有掃描任何館藏。</div>
             ) : (
               selectedSession.scannedItems.map((item) => (
                 <article key={item.id} className="book-row">
                   <div className="book-row-main">
                     <h3>{item.title ?? "未命名書籍"}</h3>
-                    <p>館藏條碼：{item.accessionCode ?? "未知"}</p>
-                    <p>ISBN：{item.isbn ?? "未填寫"}</p>
-                    <p>掃描時間：{new Date(item.scannedAt).toLocaleString("zh-TW")}</p>
+                    <p>館藏條碼：{item.accessionCode ?? "無"}</p>
+                    <p>ISBN：{item.isbn ?? "無"}</p>
+                    <p>掃描時間：{formatDateTime(item.scannedAt)}</p>
                     {item.remark ? <p>備註：{item.remark}</p> : null}
                   </div>
                   <div className="book-row-side">
@@ -420,18 +478,18 @@ export default function MobileInventoryPage() {
             <article className="hero-card compact">
               <p className="eyebrow">Missing books</p>
               <h2>未掃到清單</h2>
-              <p>這些館藏尚未在本次盤點中出現，可作為差異追查名單。</p>
+              <p>列出本次盤點尚未掃到的館藏，便於後續查找。</p>
             </article>
 
             {selectedSession.missingBooks.length === 0 ? (
-              <div className="feedback success">目前沒有未掃到的書籍。</div>
+              <div className="feedback success">目前沒有未掃到的館藏。</div>
             ) : (
               selectedSession.missingBooks.map((book) => (
                 <article key={book.id} className="book-row">
                   <div className="book-row-main">
                     <h3>{book.title}</h3>
                     <p>館藏條碼：{book.accessionCode}</p>
-                    <p>ISBN：{book.isbn ?? "未填寫"}</p>
+                    <p>ISBN：{book.isbn ?? "無"}</p>
                   </div>
                   <div className="book-row-side">
                     <span className="status-pill status-pill-overdue">未掃到</span>
