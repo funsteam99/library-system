@@ -8,7 +8,7 @@ import {
   updateUser,
 } from "../features/users/repository.js";
 import { asyncHandler } from "../lib/async-handler.js";
-import { requireAdmin } from "../lib/auth.js";
+import { getCurrentUser, requireAdmin } from "../lib/auth.js";
 import { HttpError } from "../lib/errors.js";
 import { requireParam } from "../lib/params.js";
 import { parseId } from "../lib/parse-int.js";
@@ -79,6 +79,12 @@ usersRouter.patch(
     try {
       const id = parseId(requireParam(req.params.id, "id"));
       const input = updateUserSchema.parse(req.body);
+      const currentUser = getCurrentUser(res);
+
+      if (currentUser.id === id && input.status === "inactive") {
+        throw new HttpError(400, "You cannot deactivate the current operator");
+      }
+
       const row = await updateUser(id, input);
 
       if (!row) {

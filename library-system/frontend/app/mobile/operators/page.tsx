@@ -1,9 +1,9 @@
 "use client";
 
-import { type FormEvent, useEffect, useState, useTransition } from "react";
+import { type ChangeEvent, type FormEvent, useEffect, useState, useTransition } from "react";
 
 import { apiRequest } from "../../lib/api";
-import { isAdminOperator } from "../../lib/auth";
+import { getCurrentOperatorId, isAdminOperator } from "../../lib/auth";
 
 type OperatorItem = {
   id: number;
@@ -19,6 +19,7 @@ type OperatorsResponse = {
 
 export default function MobileOperatorsPage() {
   const canManageOperators = isAdminOperator();
+  const currentOperatorId = getCurrentOperatorId();
   const [items, setItems] = useState<OperatorItem[]>([]);
   const [username, setUsername] = useState("");
   const [name, setName] = useState("");
@@ -94,6 +95,11 @@ export default function MobileOperatorsPage() {
   }
 
   function handleToggleStatus(item: OperatorItem) {
+    if (item.id === currentOperatorId && item.status === "active") {
+      setError("不能停用目前正在使用的操作者。");
+      return;
+    }
+
     setError(null);
     setMessage(null);
 
@@ -111,6 +117,31 @@ export default function MobileOperatorsPage() {
         setMessage(`已更新 ${payload.item.name} 的狀態為 ${payload.item.status}`);
       } catch (submitError) {
         setError(submitError instanceof Error ? submitError.message : "更新操作者狀態失敗");
+      }
+    });
+  }
+
+  function handleFieldUpdate(
+    item: OperatorItem,
+    field: "name" | "role",
+    value: string,
+  ) {
+    setError(null);
+    setMessage(null);
+
+    startTransition(async () => {
+      try {
+        const payload = await apiRequest<{ item: OperatorItem }>(`/api/users/${item.id}`, {
+          method: "PATCH",
+          body: JSON.stringify({
+            [field]: value,
+          }),
+        });
+
+        await loadOperators();
+        setMessage(`已更新 ${payload.item.username} 的${field === "name" ? "名稱" : "角色"}`);
+      } catch (submitError) {
+        setError(submitError instanceof Error ? submitError.message : "更新操作者資料失敗");
       }
     });
   }
@@ -167,9 +198,46 @@ export default function MobileOperatorsPage() {
         {items.map((item) => (
           <article key={item.id} className="book-row">
             <div className="book-row-main">
-              <h3>{item.name}</h3>
+              <h3>{item.name}{item.id === currentOperatorId ? "（目前使用）" : ""}</h3>
               <p>帳號：{item.username}</p>
-              <p>角色：{item.role}</p>
+              <label className="field">
+                <span>名稱</span>
+                <input
+                  value={item.name}
+                  onChange={(event: ChangeEvent<HTMLInputElement>) => {
+                    const nextName = event.target.value;
+                    setItems((current) =>
+                      current.map((operator) =>
+                        operator.id === item.id ? { ...operator, name: nextName } : operator,
+                      ),
+                    );
+                  }}
+                  onBlur={(event) => {
+                    if (event.target.value.trim() && event.target.value.trim() !== item.name) {
+                      void handleFieldUpdate(item, "name", event.target.value.trim());
+                    }
+                  }}
+                />
+              </label>
+              <label className="field">
+                <span>角色</span>
+                <select
+                  value={item.role}
+                  className="field-select"
+                  onChange={(event) => {
+                    const nextRole = event.target.value as "admin" | "staff";
+                    setItems((current) =>
+                      current.map((operator) =>
+                        operator.id === item.id ? { ...operator, role: nextRole } : operator,
+                      ),
+                    );
+                    void handleFieldUpdate(item, "role", nextRole);
+                  }}
+                >
+                  <option value="staff">staff</option>
+                  <option value="admin">admin</option>
+                </select>
+              </label>
             </div>
             <div className="book-row-side">
               <span className={item.status === "active" ? "status-pill status-pill-returned" : "status-pill status-pill-overdue-returned"}>
