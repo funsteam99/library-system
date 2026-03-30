@@ -445,6 +445,86 @@ button {
   font-size: 13px;
 }
 
+.notice-board {
+  display: grid;
+  gap: 14px;
+}
+
+.notice-hero,
+.notice-card {
+  border-radius: 24px;
+  border: 1px solid var(--line);
+}
+
+.notice-hero {
+  padding: 18px;
+  background:
+    radial-gradient(circle at top right, color-mix(in oklab, var(--accent-soft) 58%, white) 0, transparent 38%),
+    color-mix(in oklab, white 84%, var(--paper) 16%);
+}
+
+.notice-hero h3,
+.notice-card strong {
+  margin: 0;
+}
+
+.notice-hero p,
+.notice-card p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.notice-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--accent-soft) 65%, white);
+  color: var(--accent-deep);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.notice-list {
+  display: grid;
+  gap: 12px;
+}
+
+.notice-card {
+  padding: 16px;
+  background: color-mix(in oklab, white 88%, var(--paper) 12%);
+}
+
+.notice-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.notice-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.notice-warning {
+  color: oklch(0.43 0.13 70);
+  background: color-mix(in oklab, white 86%, oklch(0.86 0.07 82) 14%);
+}
+
+.notice-info {
+  color: oklch(0.43 0.08 240);
+  background: color-mix(in oklab, white 87%, oklch(0.88 0.05 240) 13%);
+}
+
+.notice-success {
+  color: oklch(0.42 0.11 145);
+  background: color-mix(in oklab, white 87%, oklch(0.87 0.08 145) 13%);
+}
+
 .cover-preview-card {
   overflow: hidden;
   border-radius: 24px;

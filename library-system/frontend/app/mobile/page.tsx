@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-import { isAdminOperator } from "../lib/auth";
+import { getStoredOperator, isAdminOperator } from "../lib/auth";
 
 const quickActions = [
   {
@@ -47,11 +47,53 @@ const quickActions = [
     title: "盤點",
     subtitle: "建立盤點批次、掃描館藏並輸出差異表。",
   },
+  {
+    href: "/mobile/operators",
+    title: "操作者管理",
+    subtitle: "新增、查看與停用 admin / staff。",
+    adminOnly: true,
+  },
+];
+
+const noticeItems = [
+  {
+    level: "warning",
+    title: "今日優先處理",
+    body: "先查看逾期借閱與未掃到清單，通常這兩塊最容易累積待辦。",
+    href: "/mobile/loans",
+    linkLabel: "查看借閱紀錄",
+  },
+  {
+    level: "info",
+    title: "建檔提醒",
+    body: "若 ISBN 只帶出部分資料，記得補出版社、出版年與館藏條碼再送出。",
+    href: "/mobile/books/new",
+    linkLabel: "前往書籍建檔",
+  },
+  {
+    level: "success",
+    title: "盤點建議",
+    body: "盤點完成後，記得匯出 Summary / Anomalies / MissingBooks 報表留存。",
+    href: "/mobile/inventory",
+    linkLabel: "前往盤點",
+  },
 ];
 
 export default function MobileHomePage() {
   const isAdmin = isAdminOperator();
+  const operator = getStoredOperator();
   const visibleActions = quickActions.filter((action) => !action.adminOnly || isAdmin);
+  const roleNotice = isAdmin
+    ? {
+        badge: "管理員消息",
+        title: "今天可先檢查匯入匯出與備份",
+        body: "你目前是 admin，可進行 Excel 匯入匯出、盤點完成與借閱修正等高權限操作。",
+      }
+    : {
+        badge: "館員消息",
+        title: "今天以借還、建檔與盤點掃描為主",
+        body: "你目前是 staff，系統會自動隱藏或限制高權限功能，避免誤操作資料。",
+      };
 
   return (
     <section className="mobile-stack">
@@ -60,9 +102,32 @@ export default function MobileHomePage() {
         <h2>手機就能處理建檔、借還與盤點</h2>
         <p>
           這個入口整合了書籍建檔、會員管理、借還書、盤點與 Excel 資料交換。
-          若你目前是館員角色，系統會自動隱藏需要管理權限的功能。
+          目前操作者是 <strong>{operator.name}</strong>，首頁下方會同步顯示本日消息與處理提醒。
         </p>
       </article>
+
+      <section className="notice-board">
+        <article className="notice-hero">
+          <div className="notice-badge">{roleNotice.badge}</div>
+          <h3>{roleNotice.title}</h3>
+          <p>{roleNotice.body}</p>
+        </article>
+
+        <div className="notice-list">
+          {noticeItems.map((notice) => (
+            <article key={notice.title} className={`notice-card notice-${notice.level}`}>
+              <div className="notice-card-top">
+                <span className="notice-dot" />
+                <strong>{notice.title}</strong>
+              </div>
+              <p>{notice.body}</p>
+              <Link href={notice.href} className="inline-link">
+                {notice.linkLabel}
+              </Link>
+            </article>
+          ))}
+        </div>
+      </section>
 
       <section className="action-grid">
         {visibleActions.map((action) => (
