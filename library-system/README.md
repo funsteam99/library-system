@@ -308,3 +308,22 @@ npm run dev
 - [register-backup-task.ps1](/C:/Users/user/Documents/Playground/library-system/scripts/register-backup-task.ps1)
 - [restore-db.ps1](/C:/Users/user/Documents/Playground/library-system/scripts/restore-db.ps1)
 - [BACKUP.md](/C:/Users/user/Documents/Playground/library-system/docs/BACKUP.md)
+
+## Local Startup (Stable)
+
+When your environment blocks background process launching, use this script:
+
+- [start-services.bat](/C:/Users/user/Documents/Playground/library-system/scripts/start-services.bat)
+
+It opens two terminal windows and keeps them alive:
+
+1. Backend on `http://localhost:4000`
+2. Frontend on `http://localhost:3000`
+
+Then open:
+
+- `http://localhost:3000/mobile/books`
+
+If only backend is down, you can start just backend with:
+
+- [start-backend.bat](/C:/Users/user/Documents/Playground/library-system/scripts/start-backend.bat)

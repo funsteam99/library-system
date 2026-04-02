@@ -21,11 +21,20 @@ import { usersRouter } from "./routes/users.js";
 
 export function createApp() {
   const app = express();
+  const safeMorganStream = {
+    write: (message: string) => {
+      try {
+        process.stdout.write(message);
+      } catch {
+        // Ignore stdout write failures so detached/background runs don't crash.
+      }
+    },
+  };
 
   app.use(helmet());
   app.use(cors({ origin: env.corsOrigin, credentials: true }));
   app.use(express.json({ limit: "10mb" }));
-  app.use(morgan("dev"));
+  app.use(morgan("dev", { stream: safeMorganStream }));
 
   app.get("/", (_req, res) => {
     res.json({
